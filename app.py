@@ -8,7 +8,7 @@ import numpy as np
 
 # Configuración inicial de la página
 st.set_page_config(
-    page_title="Análisis de Calidad de Papel y Proceso",
+    page_title="Análisis de Calidad de Papel y Proceso con RC+ 5138",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -238,7 +238,7 @@ def run_regression_analysis(df):
 # --- Cuerpo Principal de la Aplicación ---
 
 def main():
-    st.title(" Análisis de Calidad y Proceso de Fabricación de Papel 📝")
+    st.title(" Análisis de Calidad de Papel y Proceso con RC+ 5138 📝")
     st.markdown("Cargue el archivo CSV de pruebas para realizar un análisis exploratorio y un modelo de regresión clave.")
 
     # 1. Carga de Archivo
