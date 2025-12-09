@@ -8,7 +8,7 @@ import numpy as np
 
 # Configuración inicial de la página
 st.set_page_config(
-    page_title="Análisis de Calidad de Papel y Proceso (con Almidón)",
+    page_title="Análisis de Calidad de Papel y Proceso RC+5183",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -244,8 +244,8 @@ def run_regression_analysis(df):
 # --- Cuerpo Principal de la Aplicación ---
 
 def main():
-    st.title(" Análisis de Calidad y Proceso de Fabricación de Papel 📝 (Almidón Incluido)")
-    st.markdown("Cargue el archivo CSV de pruebas. La columna **'HORA'** ha sido renombrada a **'ALMIDÓN'** para el análisis.")
+    st.title(" Análisis de Calidad y Proceso de Fabricación de Papel - RC+5183")
+    st.markdown("Cargue el archivo CSV de pruebas.")
 
     # 1. Carga de Archivo
     uploaded_file = st.sidebar.file_uploader("Sube el archivo CSV con separador ';'", type="csv")
