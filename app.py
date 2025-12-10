@@ -2,40 +2,58 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
-import numpy as np
 
-# Configuración inicial de la página
-st.set_page_config(
-    page_title="Análisis de Calidad de Papel y Proceso RC+5183",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- 0. Configuración y Funciones de Limpieza ---
 
-# Configuración de estilo de gráficos (Seaborn/Matplotlib)
+# Configuración de estilo para Matplotlib/Seaborn
 sns.set_style("whitegrid")
-plt.rcParams['figure.figsize'] = (9, 6)
 
-# --- Funciones de Preprocesamiento de Datos ---
+# Columnas de interés (definidas globalmente)
+COLS_INTERES = ['REEL', 'PESO', 'SCT', 'CMT', 'COBB', 'POROSIDAD', 'DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN']
+
+def make_columns_unique_and_clean(df_input):
+    """Limpia agresivamente los nombres de columna y garantiza unicidad."""
+    df_output = df_input.copy()
+    
+    # 1. Limpieza agresiva: Eliminar espacios y caracteres invisibles
+    df_output.columns = df_output.columns.astype(str).str.strip().str.replace(r'[\n\r]', '', regex=True)
+
+    # 2. Manejo de columnas sin nombre (Unnamed)
+    new_cols_dict = {}
+    for i, name in enumerate(df_output.columns):
+        if name.startswith('Unnamed:') or name == '':
+            new_cols_dict[name] = f'Unnamed_{i}'
+    df_output.rename(columns=new_cols_dict, inplace=True)
+    
+    # 3. Desduplicación forzada
+    cols = df_output.columns.tolist()
+    seen = {}
+    new_cols = []
+    for col in cols:
+        temp_col = col
+        if temp_col in seen:
+            seen[temp_col] += 1
+            temp_col = f'{temp_col}_{seen[temp_col]}'
+        else:
+            seen[temp_col] = 0
+        new_cols.append(temp_col)
+    df_output.columns = new_cols
+    
+    return df_output
 
 @st.cache_data
-def load_and_preprocess_data(uploaded_file):
-    """
-    Carga, detecta el encabezado y preprocesa el archivo CSV, renombrando 'HORA' a 'ALMIDÓN'.
-    """
-    if uploaded_file is None:
-        return None
-        
+def load_and_preprocess_data(file_name):
+    """Carga y aplica toda la lógica de preprocesamiento y limpieza al DataFrame."""
     try:
-        # Intento 1: Detección de encabezado
-        temp_df = pd.read_csv(uploaded_file, encoding='latin1', header=None, sep=';', skip_blank_lines=False)
+        # Carga inicial para detectar encabezado
+        temp_df = pd.read_csv(file_name, encoding='latin1', header=None, sep=';', skip_blank_lines=False)
     except Exception:
-        # Intento 2: Usar UTF-8
-        uploaded_file.seek(0) # Resetear puntero
-        temp_df = pd.read_csv(uploaded_file, encoding='utf-8', header=None, sep=';', skip_blank_lines=False)
+        temp_df = pd.read_csv(file_name, encoding='utf-8', header=None, sep=';', skip_blank_lines=False)
 
-    # Buscar la fila de encabezado
+    # Detección de encabezado
     header_row_index = -1
     for i in range(10):
         if temp_df.iloc[i].astype(str).str.contains('REEL', case=False, na=False).any():
@@ -43,63 +61,73 @@ def load_and_preprocess_data(uploaded_file):
             break
 
     if header_row_index == -1:
-        st.error("❌ Error: No se pudo encontrar la fila de encabezado que contiene 'REEL' en las primeras 10 filas.")
-        return None
-        
-    uploaded_file.seek(0) # Resetear puntero para la carga final
-    try:
-        df = pd.read_csv(uploaded_file, encoding='latin1', header=header_row_index, sep=';')
-    except:
-        uploaded_file.seek(0)
-        df = pd.read_csv(uploaded_file, encoding='utf-8', header=header_row_index, sep=';')
+        st.error("No se pudo encontrar la fila de encabezado que contiene 'REEL' en las primeras 10 filas.")
+        return pd.DataFrame()
+
+    # Carga final del DataFrame
+    df = pd.read_csv(file_name, encoding='latin1', header=header_row_index, sep=';')
     
-    # Limpieza inicial de columnas
-    df.columns = df.columns.str.strip()
-    df.columns = [f'Unnamed_{i}' if name.startswith('Unnamed:') or name == '' else name for i, name in enumerate(df.columns)]
+    # 1. Limpieza de columnas (Desduplicación inicial)
+    df = make_columns_unique_and_clean(df)
     df = df.dropna(axis=1, how='all')
 
-    # *** CAMBIO CLAVE: Renombrar la columna 'HORA' a 'ALMIDÓN' ***
+    # 2. Renombres y eliminación de columnas no deseadas (Priorizando PESO)
+    if 'GRAMAJE' in df.columns:
+        df.drop(columns=['GRAMAJE'], inplace=True)
+        st.info("Columna 'GRAMAJE' eliminada (se mantiene 'PESO').")
+        
     if 'HORA' in df.columns:
         df.rename(columns={'HORA': 'ALMIDÓN'}, inplace=True)
-    
-    # Columnas de interés actualizadas
-    cols_interes = ['REEL', 'GRAMAJE', 'SCT', 'CMT', 'COBB', 'POROSIDAD', 'DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN']
+        
+    # 3. Segunda limpieza de columnas (Post-rename)
+    df = make_columns_unique_and_clean(df)
 
-    # Conversión a numérico y manejo de comas
-    for col in cols_interes:
+    # 4. Conversión a numérico (manejo de comas)
+    for col in COLS_INTERES:
         if col in df.columns:
-            if df[col].dtype == 'object':
-                 df[col] = df[col].astype(str).str.replace(',', '.', regex=False).str.strip()
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            col_array_str = df[col].values.astype(str).flatten() 
+            col_series = pd.Series(col_array_str) 
+            col_series = col_series.str.replace(',', '.', regex=False).str.strip()
+            df[col] = pd.to_numeric(col_series, errors='coerce')
 
-    # Limpieza de filas y tratamiento de NaNs
+    # 5. Limpieza y manejo de nulos
     df_limpio = df.dropna(subset=['REEL']).copy()
     
-    # Rellenar NaN en propiedades con la media (incluyendo 'ALMIDÓN')
-    for col in ['GRAMAJE', 'SCT', 'CMT', 'COBB', 'POROSIDAD', 'DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN']: 
+    for col in [c for c in COLS_INTERES if c != 'REEL']:
         if col in df_limpio.columns:
-            df_limpio[col].fillna(df_limpio[col].mean(), inplace=True)
+            mean_val = df_limpio[col].mean()
+            df_limpio.loc[:, col] = df_limpio[col].fillna(mean_val) 
 
+    # 6. Filtrado final y garantía de tipo 1D
     df_analisis = df_limpio[df_limpio['REEL'] > 0].copy()
 
+    for col in df_analisis.columns:
+        if col in COLS_INTERES:
+            if isinstance(df_analisis[col].values, np.ndarray) and df_analisis[col].values.ndim == 2:
+                df_analisis.loc[:, col] = df_analisis[col].values.flatten()
+            elif isinstance(df_analisis[col], pd.Series) and df_analisis[col].empty == False:
+                 df_analisis.loc[:, col] = df_analisis[col].astype(float)
+                 
     return df_analisis
 
-# --- Funciones de Visualización ---
+# --- 2. Funciones de Visualización ---
 
 def plot_variation_vs_reel(df, features):
     """Genera gráficos de línea para ver la variación de las propiedades vs. REEL."""
-    st.subheader("1. Variación de Propiedades Clave vs. REEL")
+    st.subheader("📈 Variación de Propiedades vs. REEL")
     existing_features = [f for f in features if f in df.columns] 
     if not existing_features: 
-        st.warning("No se encontraron propiedades de papel para este gráfico.")
+        st.warning("No hay características válidas para graficar.")
         return
-
+    
+    df_plot = df[['REEL'] + existing_features].copy()
+    
     n_features = len(existing_features)
     fig, axes = plt.subplots(n_features, 1, figsize=(12, 5 * n_features), sharex=True)
     if n_features == 1: axes = [axes]
 
     for i, feature in enumerate(existing_features):
-        sns.lineplot(x='REEL', y=feature, data=df, ax=axes[i], marker='o', label=feature, color='darkblue')
+        sns.lineplot(x='REEL', y=feature, data=df_plot, ax=axes[i], marker='o', label=feature, color='darkblue')
         axes[i].set_title(f'Variación de {feature} a lo largo de los REELs')
         axes[i].set_ylabel(feature)
         axes[i].grid(axis='y', linestyle='--')
@@ -107,46 +135,44 @@ def plot_variation_vs_reel(df, features):
     axes[-1].set_xlabel('REEL')
     plt.tight_layout()
     st.pyplot(fig)
-    plt.close(fig)
+    
 
 def plot_correlation_matrix(df, features):
     """Genera un mapa de calor (heatmap) para visualizar la matriz de correlación."""
-    st.subheader("2. Matriz de Correlación Ampliada (Propiedades y Proceso)")
+    st.subheader("🔥 Matriz de Correlación de Propiedades")
     existing_features = [f for f in features if f in df.columns and df[f].nunique() > 1]
     if len(existing_features) < 2: 
-        st.warning("No hay suficientes variables para calcular la correlación.")
+        st.warning("Se requieren al menos dos variables que varíen para calcular la correlación.")
         return
-
+        
     corr_matrix = df[existing_features].corr()
     fig, ax = plt.subplots(figsize=(12, 10))
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5, linecolor='black', 
                 cbar_kws={'label': 'Coeficiente de Correlación'}, ax=ax)
     ax.set_title('Matriz de Correlación Ampliada entre las Propiedades del Papel')
-    st.pyplot(fig)
-    plt.close(fig)
+    st.pyplot(fig) 
 
-def plot_scatter_relationships(df, x_col, y_cols, plot_number, custom_title=None):
-    """Genera gráficos de dispersión para analizar la relación entre x_col y varias y_cols."""
-    
+def plot_scatter_relationships(df, x_col, y_cols):
+    """Genera gráficos de dispersión para analizar la relación entre una variable y otras."""
     if x_col not in df.columns: return
     existing_y_cols = [y for y in y_cols if y in df.columns and df[y].nunique() > 1]
     if not existing_y_cols: return
-
-    title = custom_title if custom_title else f"Análisis de Propiedades vs. {x_col}"
-    st.subheader(f"{plot_number}. {title}")
-    
+        
+    st.subheader(f"scatterplot Gráficos de Dispersión vs. **{x_col}**")
     n_plots = len(existing_y_cols)
     cols = 2
     rows = (n_plots + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
     axes = axes.flatten()
 
+    df_plot = df[[x_col] + existing_y_cols].copy() 
+
     for i, y_col in enumerate(existing_y_cols):
-        sns.scatterplot(x=x_col, y=y_col, data=df, ax=axes[i], alpha=0.7, color='teal')
-        # Añadir línea de regresión
-        if df[x_col].nunique() > 1:
+        sns.scatterplot(x=x_col, y=y_col, data=df_plot, ax=axes[i], alpha=0.7, color='teal')
+        # Añadir línea de regresión para visualizar la tendencia lineal
+        if df_plot[x_col].nunique() > 1:
             try:
-                sns.regplot(x=x_col, y=y_col, data=df, ax=axes[i], scatter=False, color='red', line_kws={'linestyle':'--'})
+                sns.regplot(x=x_col, y=y_col, data=df_plot, ax=axes[i], scatter=False, color='red', line_kws={'linestyle':'--'})
             except:
                 pass 
         axes[i].set_title(f'{y_col} vs. {x_col}')
@@ -157,162 +183,135 @@ def plot_scatter_relationships(df, x_col, y_cols, plot_number, custom_title=None
 
     plt.tight_layout()
     st.pyplot(fig)
-    plt.close(fig)
 
-def plot_histograms(df, features, plot_number):
-    """Genera histogramas de distribución de propiedades."""
-    existing_features = [f for f in features if f in df.columns]
-    if not existing_features: 
-        st.warning("No se encontraron propiedades para generar los histogramas.")
+def plot_histograms(df, features):
+    """Genera histogramas para la distribución de propiedades."""
+    st.subheader("📊 Distribución de Frecuencia (Histogramas)")
+    existing_features = [f for f in features if f in df.columns and df[f].nunique() > 1]
+    
+    if not existing_features:
+        st.warning("No hay variables válidas para generar histogramas.")
         return
 
-    st.subheader(f"{plot_number}. Distribución de las Propiedades del Papel (Histogramas)")
-    # Crear la figura para el histograma
-    fig = plt.figure(figsize=(15, 10))
-    # Usamos ax=fig.gca() para asegurar que hist funcione en Streamlit
-    df[existing_features].hist(ax=fig.gca(), bins=10, edgecolor='black', color='skyblue') 
+    df[existing_features].hist(figsize=(15, 10), bins=10, edgecolor='black', color='skyblue')
     plt.suptitle('Distribución de Frecuencia de las Propiedades del Papel', y=1.02)
     plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
+    st.pyplot(plt.gcf())
 
-
-# --- Función de Regresión Múltiple (Añadiendo ALMIDÓN) ---
-
-def run_regression_analysis(df):
-    """Ejecuta y muestra el análisis de regresión múltiple para SCT."""
-    st.header("📊 Análisis de Regresión Múltiple: Impacto en la Resistencia (SCT) 📉")
+def run_regression_analysis(df, properties, process_vars):
+    """Ejecuta y muestra el análisis de regresión múltiple."""
+    st.header("🔬 Análisis de Regresión Múltiple: Impacto en la Resistencia (SCT)")
     
-    # Ahora incluye ALMIDÓN en las variables del modelo
-    model_cols = ['SCT', 'DOSIFICACIÓN', 'VELOCIDAD', 'GRAMAJE', 'ALMIDÓN']
+    model_cols = ['SCT'] + process_vars + [p for p in properties if p != 'SCT']
     model_cols_present = [col for col in model_cols if col in df.columns]
     
-    if 'SCT' not in model_cols_present:
-        st.error("Error: La variable dependiente 'SCT' no está disponible para la regresión.")
-        return
-
-    model_df = df[model_cols_present].dropna()
-
+    # Usar solo filas sin NaN en las variables del modelo
+    model_df = df[model_cols_present].dropna().copy() 
+    
     if len(model_cols_present) < 2 or model_df.empty:
-        st.warning("No hay suficientes datos limpios o variables (DOSIFICACIÓN, VELOCIDAD, GRAMAJE, ALMIDÓN) para ejecutar la regresión múltiple.")
+        st.warning("No hay suficientes datos limpios o variables para ejecutar la regresión múltiple.")
         return
 
-    # Definimos la fórmula del modelo: SCT ~ DOSIFICACIÓN + VELOCIDAD + GRAMAJE + ALMIDÓN
+    # Definir la fórmula del modelo:
     formula_components = [c for c in model_cols_present if c != 'SCT']
-    formula = 'SCT ~ ' + ' + '.join(formula_components)
+    formula = 'SCT ~ ' + ' + '.join(formula_components) 
+    st.text(f"Fórmula del modelo: {formula}")
 
     try:
+        # Ajustar el modelo de Mínimos Cuadrados Ordinarios (OLS)
         model = ols(formula, data=model_df).fit()
-        
-        st.subheader("Resumen Estadístico del Modelo")
+
+        st.markdown("### Resumen Estadístico")
         st.code(model.summary().as_text())
 
-        st.subheader("Interpretación de Coeficientes Clave")
-
-        # Coeficiente R-cuadrado ajustado
+        st.markdown("### Interpretación de Coeficientes")
         r_squared_adj = model.rsquared_adj
-        st.metric(label="R-cuadrado Ajustado", value=f"{r_squared_adj:.3f}", 
-                  help=f"El {r_squared_adj*100:.1f}% de la variación en SCT es explicada por el modelo.")
+        st.write(f"**R-cuadrado Ajustado:** `{r_squared_adj:.3f}`")
+        st.write(f"  -> Esto significa que el **{r_squared_adj*100:.1f}%** de la variación en SCT es explicada por las variables del modelo.")
+
         st.markdown("---")
 
-        # Conclusiones individuales para cada predictor
         for var in formula_components:
             coef = model.params.get(var)
             p_val = model.pvalues.get(var)
 
             if pd.isna(coef) or pd.isna(p_val):
-                st.info(f"**Efecto de {var}:** Coeficiente o P-valor no disponible.")
+                st.write(f"**Efecto de {var}:** Coeficiente o P-valor no disponible.")
                 continue
 
-            st.markdown(f"**Efecto de {var}:**")
-            col1, col2 = st.columns(2)
-            col1.metric("Coeficiente", f"{coef:.4f}")
-            col2.metric("P-valor", f"{p_val:.4f}")
+            col1, col2 = st.columns([1, 2])
+            col1.metric(label=f"Coeficiente de {var}", value=f"{coef:.4f}")
+            col2.write(f"P-valor: `{p_val:.4f}`")
 
             if p_val < 0.05:
-                st.success(f"La **{var}** tiene un impacto estadísticamente **significativo** en el SCT.")
-                st.markdown(f"*(Interpretación: Por cada unidad de aumento en {var}, el SCT varía en **{coef:.4f}** unidades, manteniendo las otras variables constantes.)*")
+                st.success(f"**Conclusión:** La **{var}** tiene un impacto estadísticamente **significativo** en el SCT.") 
+                st.write(f"  -> Por cada unidad que aumente la **{var}**, el SCT varía en **{coef:.4f}** unidades (manteniendo las otras variables constantes).")
             else:
-                st.info(f"La **{var}** NO tiene un impacto estadísticamente significativo en el SCT (P > 0.05) en este modelo.")
-            
-            st.markdown("---")
-            
+                st.warning(f"**Conclusión:** La {var} NO tiene un impacto estadísticamente significativo en el SCT (P > 0.05) en este modelo.")
+
     except Exception as e:
-        st.error(f"⚠️ Error al ejecutar el modelo de regresión. Asegúrese de que las columnas tengan datos válidos. Detalle: {e}")
+        st.error(f"ERROR: No se pudo ejecutar el modelo de regresión: {e}")
 
+# --- 3. Streamlit App Layout ---
 
-# --- Cuerpo Principal de la Aplicación ---
+st.title("📄 Análisis de Calidad y Proceso del Papel")
+st.markdown("Esta aplicación realiza una limpieza robusta de datos y ejecuta un análisis exploratorio y de regresión sobre las propiedades del papel.")
 
-def main():
-    st.title(" Análisis de Calidad y Proceso de Fabricación de Papel - RC+5183")
-    st.markdown("Cargue el archivo CSV de pruebas.")
+uploaded_file = st.file_uploader("Sube tu archivo CSV (separado por ';')", type=["csv"])
 
-    # 1. Carga de Archivo
-    uploaded_file = st.sidebar.file_uploader("Sube el archivo CSV con separador ';'", type="csv")
+if uploaded_file is not None:
+    # Guardamos el archivo subido localmente para que la función @st.cache_data pueda usarlo.
+    # En un entorno de producción, esto debería ser más robusto.
+    file_path = "uploaded_data.csv"
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-    if uploaded_file is not None:
-        df_analisis = load_and_preprocess_data(uploaded_file)
-        
-        if df_analisis is None:
-            return
+    df_analisis = load_and_preprocess_data(file_path)
 
-        st.success("✅ Datos cargados y preprocesados con éxito.")
+    if not df_analisis.empty:
+        st.success("✅ Datos cargados y preprocesados correctamente.")
 
-        # Variables de interés
-        propiedades_papel = ['GRAMAJE', 'SCT', 'CMT', 'COBB', 'POROSIDAD']
-        variables_proceso = ['DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN'] # ALMIDÓN incluido
+        # Definir las variables para los gráficos
+        propiedades_papel = ['PESO', 'SCT', 'CMT', 'COBB', 'POROSIDAD']
+        variables_proceso = ['DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN'] 
         todas_las_variables = propiedades_papel + variables_proceso
 
-        # 2. Análisis Exploratorio de Datos (EDA)
-        st.header("🔍 Análisis Exploratorio de Datos (EDA)")
+        st.markdown("---")
         
-        # Mostrar datos
-        if st.checkbox("Mostrar Primeras Filas del DataFrame Limpio y Dimensiones"):
-            cols_to_show = [c for c in todas_las_variables + ['REEL'] if c in df_analisis.columns]
-            st.dataframe(df_analisis[cols_to_show].head())
-            st.write(f"Filas totales en el dataset de análisis: **{len(df_analisis)}**")
-            st.markdown("---")
-
-
-        # --- Generación de Gráficos (Manteniendo el orden y añadiendo ALMIDÓN) ---
-
-        # 1. Variación de las propiedades clave respecto al REEL (Original 1)
-        plot_variation_vs_reel(df_analisis, propiedades_papel)
+        # 1. Mostrar datos limpios
+        st.subheader("Datos de Análisis (Primeras 5 Filas)")
+        st.dataframe(df_analisis[[c for c in COLS_INTERES if c in df_analisis.columns]].head())
+        
         st.markdown("---")
+        st.header("Gráficos de Análisis Exploratorio (EDA)")
 
-        # 2. Matriz de correlación ampliada (incluye proceso y ALMIDÓN) (Original 2)
+        # 2. Variación de las propiedades clave respecto al REEL
+        plot_variation_vs_reel(df_analisis, propiedades_papel) 
+
+        # 3. Matriz de correlación ampliada (incluye proceso)
         plot_correlation_matrix(df_analisis, todas_las_variables)
+
+        # 4. Gráficos de dispersión: Proceso vs. Propiedades
+        plot_scatter_relationships(df_analisis, 'DOSIFICACIÓN', propiedades_papel)
+        plot_scatter_relationships(df_analisis, 'VELOCIDAD', propiedades_papel)
+        if 'ALMIDÓN' in df_analisis.columns:
+            plot_scatter_relationships(df_analisis, 'ALMIDÓN', propiedades_papel)
+        else:
+            st.warning("Gráficos de ALMIDÓN omitidos porque la columna no fue encontrada.")
+
+        # 5. Gráficos de dispersión entre pares de propiedades (Peso vs. Propiedades)
+        st.markdown("### Relaciones Clave entre Propiedades")
+        plot_scatter_relationships(df_analisis, 'PESO', ['SCT', 'CMT', 'COBB']) 
+        plot_scatter_relationships(df_analisis, 'SCT', ['CMT', 'POROSIDAD'])
+
+        # 6. Histograma de distribución de propiedades
+        plot_histograms(df_analisis, propiedades_papel)
+
         st.markdown("---")
+        
+        # 7. Análisis de Regresión Múltiple
+        run_regression_analysis(df_analisis, propiedades_papel, variables_proceso)
 
-        # 3. Análisis de las variables de Proceso vs. Propiedades (DOSIFICACIÓN) (Original 3)
-        plot_scatter_relationships(df_analisis, 'DOSIFICACIÓN', propiedades_papel, "3. Análisis de Propiedades vs. DOSIFICACIÓN")
-        st.markdown("---")
-
-        # 4. Análisis de las variables de Proceso vs. Propiedades (VELOCIDAD) (Original 4)
-        plot_scatter_relationships(df_analisis, 'VELOCIDAD', propiedades_papel, "4. Análisis de Propiedades vs. VELOCIDAD")
-        st.markdown("---")
-
-        # 5. Impacto de ALMIDÓN vs. Propiedades de Calidad (NUEVO GRÁFICO)
-        plot_scatter_relationships(df_analisis, 'ALMIDÓN', propiedades_papel, "5. Impacto de ALMIDÓN vs. Propiedades de Calidad")
-        st.markdown("---")
-
-
-        # 6a. Gráficos de dispersión: GRAMAJE vs... (Parte del Original 5/6)
-        plot_scatter_relationships(df_analisis, 'GRAMAJE', ['SCT', 'CMT', 'COBB'], "6a. Relación de GRAMAJE con Resistencia y Absorción")
-        # 6b. Gráficos de dispersión: SCT vs... (Parte del Original 5/6)
-        plot_scatter_relationships(df_analisis, 'SCT', ['CMT', 'POROSIDAD'], "6b. Relación de SCT con CMT y Porosidad")
-        st.markdown("---")
-
-        # 7. Histograma de distribución de propiedades (Original 7)
-        plot_histograms(df_analisis, propiedades_papel, "7")
-        st.markdown("---")
-
-
-        # 3. Análisis de Regresión Múltiple (Actualizado con ALMIDÓN)
-        run_regression_analysis(df_analisis)
 
     else:
-        st.info("Esperando la carga del archivo CSV. Por favor, suba el archivo en la barra lateral izquierda para comenzar el análisis.")
-
-if __name__ == "__main__":
-    main()
+        st.error("No se pudo generar el DataFrame de análisis. Por favor, revise el formato de su archivo CSV.")
