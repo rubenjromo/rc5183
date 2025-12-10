@@ -254,8 +254,8 @@ def run_regression_analysis(df, properties, process_vars):
 
 # --- 3. Streamlit App Layout ---
 
-st.title("📄 Análisis de Calidad y Proceso del Papel")
-st.markdown("Esta aplicación realiza una limpieza robusta de datos y ejecuta un análisis exploratorio y de regresión sobre las propiedades del papel.")
+st.title("📄 Análisis de Calidad y Proceso del Papel - RC+5183")
+st.markdown("Dashboard Estadístico.")
 
 uploaded_file = st.file_uploader("Sube tu archivo CSV (separado por ';')", type=["csv"])
 
