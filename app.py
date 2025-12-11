@@ -296,7 +296,7 @@ def calculate_averages_by_gramaje(df):
 
 def main():
     st.title("📊 Análisis Exploratorio y Regresión de Calidad de Papel")
-    st.markdown("Cargue su archivo CSV (delimitado por `;`) con datos de proceso y calidad para generar el análisis completo.")
+    st.markdown("Cargue archivo CSV.")
 
     # --- Sidebar para Carga de Archivo ---
     with st.sidebar:
