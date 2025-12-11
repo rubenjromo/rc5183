@@ -368,7 +368,7 @@ def main():
         st.markdown("---")
 
         # FILA 2: LABIO, CHORRO, COLUMNA
-        st.subheader("2.4 Gráficos de Dispersión (Nuevas Variables de Proceso vs. Propiedades de Calidad)")
+        st.subheader("2.4 Gráficos de Dispersión - vs. Propiedades de Calidad")
         col_disp4, col_disp5, col_disp6 = st.columns(3)
 
         with col_disp4:
