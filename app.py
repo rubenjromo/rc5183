@@ -15,6 +15,7 @@ st.set_page_config(layout="wide", page_title="Análisis de Calidad y Proceso de 
 COLS_INTERES = ['REEL', 'GRAMAJE', 'PESO', 'SCT', 'CMT', 'COBB', 'POROSIDAD',
                 'DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN',
                 'LABIO', 'CHORRO', 'COLUMNA']
+sns.set_style("whitegrid")
 
 # ==============================================================================
 # === 1. FUNCIÓN DE CARGA Y LIMPIEZA DE DATOS (CON CACHÉ) ===
@@ -29,6 +30,7 @@ def load_and_clean_data(uploaded_file):
     try:
         # 1. Detección de encabezado
         file_data = uploaded_file.getvalue()
+        # Usamos io.StringIO para leer el contenido del archivo cargado en memoria
         temp_df = pd.read_csv(io.StringIO(file_data.decode('latin1')), header=None, sep=';', skip_blank_lines=False)
         
         header_row_index = -1
@@ -237,9 +239,7 @@ def run_ols_analysis_clean(df, dependent_var):
         headers = ["Variable", "Coeficiente", "P-valor", "Significativo", "Interpretación"]
         st.subheader("Coeficientes del Modelo: Impacto Individual")
         
-        # Crear un DataFrame para mostrar con st.dataframe
         coef_df = pd.DataFrame(results, columns=headers)
-        # Formatear las columnas numéricas para mejor lectura
         coef_df['Coeficiente'] = coef_df['Coeficiente'].apply(lambda x: f"{x:.4f}")
         coef_df['P-valor'] = coef_df['P-valor'].apply(lambda x: f"{x:.4f}")
         
@@ -253,7 +253,6 @@ def run_ols_analysis_clean(df, dependent_var):
         for var in formula_components:
             coef = model.params.get(var)
             sign = "+" if coef >= 0 else "-"
-            # Uso de \cdot y \mathbf{} para correcto renderizado en LaTeX
             equation_latex += f" {sign} {abs(coef):.4f} \cdot \mathbf{{{var}}}"
         
         st.latex(equation_latex)
@@ -296,7 +295,7 @@ def calculate_averages_by_gramaje(df):
 # ==============================================================================
 
 def main():
-    st.title("📊 Análisis Exploratorio y Regresión de Calidad de Papel - RC+5183")
+    st.title("📊 Análisis Exploratorio y Regresión de Calidad de Papel")
     st.markdown("Cargue su archivo CSV (delimitado por `;`) con datos de proceso y calidad para generar el análisis completo.")
 
     # --- Sidebar para Carga de Archivo ---
@@ -331,51 +330,99 @@ def main():
         variables_nuevas = ['LABIO', 'CHORRO', 'COLUMNA']
         todas_las_variables = propiedades_papel + variables_proceso + variables_nuevas
         
-        # Correlación
-        st.subheader("2.1 Matriz de Correlación")
-        fig_corr = plot_correlation_matrix(df_analisis, todas_las_variables)
-        if fig_corr: st.pyplot(fig_corr)
+        # 2.1 Correlación y Variación
+        col_sec1, col_sec2 = st.columns(2)
+        
+        with col_sec1:
+            st.subheader("2.1 Matriz de Correlación")
+            fig_corr = plot_correlation_matrix(df_analisis, todas_las_variables)
+            if fig_corr: st.pyplot(fig_corr)
+            
+        with col_sec2:
+            st.subheader("2.2 Variación de Propiedades vs. REEL")
+            fig_reel = plot_variation_vs_reel(df_analisis, propiedades_papel)
+            if fig_reel: st.pyplot(fig_reel)
+
         st.markdown("---")
 
-        # Variación vs REEL
-        st.subheader("2.2 Variación de Propiedades vs. REEL")
-        fig_reel = plot_variation_vs_reel(df_analisis, propiedades_papel)
-        if fig_reel: st.pyplot(fig_reel)
-        st.markdown("---")
-        
-        # Dispersión
+        # 2.3 Gráficos de Dispersión (Variables de Proceso vs. Propiedades de Calidad)
         st.subheader("2.3 Gráficos de Dispersión (Proceso vs. Calidad)")
         
-        col_disp1, col_disp2 = st.columns(2)
+        col_disp1, col_disp2, col_disp3 = st.columns(3)
         
+        # FILA 1: DOSIFICACIÓN, VELOCIDAD, ALMIDÓN
         with col_disp1:
-            st.markdown("**Relación con DOSIFICACIÓN**")
+            st.markdown("##### Relación con **DOSIFICACIÓN**")
             fig_dosif = plot_scatter_relationships(df_analisis, 'DOSIFICACIÓN', propiedades_papel)
             if fig_dosif: st.pyplot(fig_dosif)
         
         with col_disp2:
-            st.markdown("**Relación con ALMIDÓN**")
+            st.markdown("##### Relación con **VELOCIDAD**")
+            fig_vel = plot_scatter_relationships(df_analisis, 'VELOCIDAD', propiedades_papel)
+            if fig_vel: st.pyplot(fig_vel)
+        
+        with col_disp3:
+            st.markdown("##### Relación con **ALMIDÓN**")
             fig_almidon = plot_scatter_relationships(df_analisis, 'ALMIDÓN', propiedades_papel)
             if fig_almidon: st.pyplot(fig_almidon)
             
         st.markdown("---")
 
-        # Histogramas
-        st.subheader("2.4 Distribución de Variables")
-        fig_hist_prop = plot_histograms(df_analisis, propiedades_papel, "Propiedades del Papel")
-        if fig_hist_prop: st.pyplot(fig_hist_prop)
+        # FILA 2: LABIO, CHORRO, COLUMNA
+        st.subheader("2.4 Gráficos de Dispersión (Nuevas Variables de Proceso vs. Propiedades de Calidad)")
+        col_disp4, col_disp5, col_disp6 = st.columns(3)
+
+        with col_disp4:
+            st.markdown("##### Relación con **LABIO**")
+            fig_labio = plot_scatter_relationships(df_analisis, 'LABIO', propiedades_papel)
+            if fig_labio: st.pyplot(fig_labio)
         
-        fig_hist_proc = plot_histograms(df_analisis, variables_nuevas, "Variables de Proceso (LABIO, CHORRO, COLUMNA)")
-        if fig_hist_proc: st.pyplot(fig_hist_proc)
+        with col_disp5:
+            st.markdown("##### Relación con **CHORRO**")
+            fig_chorro = plot_scatter_relationships(df_analisis, 'CHORRO', propiedades_papel)
+            if fig_chorro: st.pyplot(fig_chorro)
+        
+        with col_disp6:
+            st.markdown("##### Relación con **COLUMNA**")
+            fig_columna = plot_scatter_relationships(df_analisis, 'COLUMNA', propiedades_papel)
+            if fig_columna: st.pyplot(fig_columna)
+            
+        st.markdown("---")
+
+        # FILA 3: DISPERSIÓN ENTRE PROPIEDADES 
+        st.subheader("2.5 Dispersión entre Propiedades de Calidad")
+        col_disp7, col_disp8 = st.columns(2)
+
+        with col_disp7:
+            st.markdown("##### **PESO** vs. SCT/CMT/COBB")
+            fig_peso = plot_scatter_relationships(df_analisis, 'PESO', ['SCT', 'CMT', 'COBB'])
+            if fig_peso: st.pyplot(fig_peso)
+
+        with col_disp8:
+            st.markdown("##### **SCT** vs. CMT/POROSIDAD")
+            fig_sct = plot_scatter_relationships(df_analisis, 'SCT', ['CMT', 'POROSIDAD'])
+            if fig_sct: st.pyplot(fig_sct)
+
+        st.markdown("---")
+
+        # 2.6 Histogramas
+        st.subheader("2.6 Distribución de Variables")
+        
+        col_hist1, col_hist2 = st.columns(2)
+
+        with col_hist1:
+            fig_hist_prop = plot_histograms(df_analisis, propiedades_papel, "Propiedades del Papel")
+            if fig_hist_prop: st.pyplot(fig_hist_prop)
+        
+        with col_hist2:
+            fig_hist_proc = plot_histograms(df_analisis, variables_nuevas, "Variables de Proceso (LABIO, CHORRO, COLUMNA)")
+            if fig_hist_proc: st.pyplot(fig_hist_proc)
 
     # --- PESTAÑA 3: REGRESIÓN OLS ---
     with tab3:
         st.header("3. Regresión Múltiple por Mínimos Cuadrados Ordinarios (OLS)")
         
-        # Regresión para SCT
         run_ols_analysis_clean(df_analisis, 'SCT')
-
-        # Regresión para CMT
         run_ols_analysis_clean(df_analisis, 'CMT')
 
     # --- PESTAÑA 4: PROMEDIOS AGRUPADOS ---
