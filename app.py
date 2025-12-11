@@ -319,8 +319,7 @@ def main():
         st.header("1. Datos Limpios y Preprocesados")
         st.markdown(f"**Filas:** {df_analisis.shape[0]}, **Columnas:** {df_analisis.shape[1]}")
         st.dataframe(df_analisis.head(10))
-        st.markdown("**Nota:** Las columnas `Unnamed_` y filas vacías han sido eliminadas. Los valores NaN han sido imputados con la media.")
-
+      
     # --- PESTAÑA 2: VISUALIZACIONES ---
     with tab2:
         st.header("2. Visualizaciones Clave")
