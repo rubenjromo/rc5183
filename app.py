@@ -287,7 +287,7 @@ def calculate_averages_by_gramaje(df):
     averages_df = df_temp.groupby('GRAMAJE')[numeric_cols].mean().reset_index()
     averages_df = averages_df.round(2)
     
-    st.markdown("Esta tabla muestra el valor promedio de cada propiedad y variable de proceso para cada tipo de **GRAMAJE** presente en el conjunto de datos.")
+    st.markdown("Se muestra el valor promedio de cada propiedad y variable de proceso para cada tipo de **gramaje** presente en el conjunto de datos.")
     st.dataframe(averages_df)
     
 # ==============================================================================
@@ -296,7 +296,7 @@ def calculate_averages_by_gramaje(df):
 
 def main():
     st.title("📊 Análisis Exploratorio y Regresión de Calidad de Papel")
-    st.markdown("Cargue archivo CSV.")
+    st.markdown("Pruebas con RC+5183")
 
     # --- Sidebar para Carga de Archivo ---
     with st.sidebar:
@@ -338,14 +338,14 @@ def main():
             if fig_corr: st.pyplot(fig_corr)
             
         with col_sec2:
-            st.subheader("2.2 Variación de Propiedades vs. REEL")
+            st.subheader("2.2 Variación de Propiedades por REEL")
             fig_reel = plot_variation_vs_reel(df_analisis, propiedades_papel)
             if fig_reel: st.pyplot(fig_reel)
 
         st.markdown("---")
 
         # 2.3 Gráficos de Dispersión (Variables de Proceso vs. Propiedades de Calidad)
-        st.subheader("2.3 Gráficos de Dispersión (Proceso vs. Calidad)")
+        st.subheader("2.3 Gráficos de Dispersión")
         
         col_disp1, col_disp2, col_disp3 = st.columns(3)
         
@@ -368,7 +368,7 @@ def main():
         st.markdown("---")
 
         # FILA 2: LABIO, CHORRO, COLUMNA
-        st.subheader("2.4 Gráficos de Dispersión - vs. Propiedades de Calidad")
+        st.subheader("2.4 Gráficos de Dispersión - Propiedades de Calidad")
         col_disp4, col_disp5, col_disp6 = st.columns(3)
 
         with col_disp4:
@@ -426,7 +426,7 @@ def main():
 
     # --- PESTAÑA 4: PROMEDIOS AGRUPADOS ---
     with tab4:
-        st.header("4. Análisis de Promedios Agrupados")
+        st.header("4. Análisis de Promedios por Gramaje")
         calculate_averages_by_gramaje(df_analisis)
 
 if __name__ == "__main__":
