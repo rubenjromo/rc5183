@@ -251,16 +251,16 @@ def run_regression_model(df, target_col, predictors):
 # --- 4. Streamlit App Layout (Función Principal) ---
 
 def main():
-    st.title("📊 Análisis de Propiedades del Papel y Variables de Proceso")
+    st.title("Análisis de Propiedades del Papel y Variables de Proceso - RC+5183")
     
     # 🌟 Permitir subir archivo (CORRECCIÓN CLAVE)
-    uploaded_file = st.sidebar.file_uploader("Sube tu archivo CSV de Pruebas (Separador: ';', Decimal: ',')", type=["csv"])
+    uploaded_file = st.sidebar.file_uploader("Cargar archivo csv", type=["csv"])
 
     if uploaded_file is not None:
         st.sidebar.success("Archivo cargado correctamente. Procesando...")
         df_analisis = load_and_preprocess_data(uploaded_file)
     else:
-        st.info("Por favor, sube un archivo CSV para comenzar el análisis. ¡Asegúrate de que contenga la columna 'REEL'!")
+        st.info("Esperando carga de base de datos...")
         return 
 
     if df_analisis.empty:
@@ -277,7 +277,7 @@ def main():
     
     # Mostrar datos
     if st.sidebar.checkbox("Mostrar Datos Preprocesados"):
-        st.header("🔍 Vista Previa de los Datos Limpios")
+        st.header("🔍 Vista Previa de los Datos")
         st.dataframe(df_analisis[[c for c in todas_las_variables if c in df_analisis.columns]].head(10))
         st.write(f"Total de filas para análisis: {len(df_analisis)}")
         st.write(f"Columnas detectadas y limpiadas: {', '.join(df_analisis.columns.tolist())}")
@@ -294,6 +294,7 @@ def main():
         plot_correlation_matrix(df_analisis, todas_las_variables)
 
         plot_histograms(df_analisis, propiedades_papel, '3. Distribución de Frecuencia de las Propiedades del Papel')
+      
         plot_histograms(df_analisis, variables_nuevas, '4. Distribución de Frecuencia de LABIO, CHORRO y COLUMNA')
 
     # --- Gráficos de Dispersión Dinámicos ---
