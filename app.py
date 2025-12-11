@@ -295,7 +295,7 @@ def calculate_averages_by_gramaje(df):
 # ==============================================================================
 
 def main():
-    st.title("📊 Análisis Exploratorio y Regresión de Calidad de Papel")
+    st.title("📊 Análisis Exploratorio y Modelo de Regresión en Producción de Papel")
     st.markdown("Pruebas con RC+5183")
 
     # --- Sidebar para Carga de Archivo ---
@@ -312,11 +312,11 @@ def main():
         st.stop()
         
     # --- Pestañas de Análisis ---
-    tab1, tab2, tab3, tab4 = st.tabs(["Data Limpia", "📈 Visualizaciones", "🔍 Regresión OLS", "📋 Promedios"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Datos", "📈 Visualizaciones", "🔍 Regresión OLS", "📋 Promedios"])
 
     # --- PESTAÑA 1: DATA LIMPIA ---
     with tab1:
-        st.header("1. Datos Limpios y Preprocesados")
+        st.header("1. Muestra de datos de proceso")
         st.markdown(f"**Filas:** {df_analisis.shape[0]}, **Columnas:** {df_analisis.shape[1]}")
         st.dataframe(df_analisis.head(10))
       
