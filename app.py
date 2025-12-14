@@ -437,8 +437,7 @@ def main():
     # --- CONTENIDO PRINCIPAL ---
     
     if uploaded_file is None:
-        st.markdown("### ¡Bienvenido!")
-        st.markdown("Por favor, sube tu archivo CSV en la barra lateral izquierda para iniciar el análisis completo.")
+        st.markdown("Favor subir el archivo CSV en la barra lateral izquierda para iniciar el análisis completo.")
         return
 
     df_analisis, df_analisis_ols, df_analisis_scatter = load_and_preprocess_data(uploaded_file)
