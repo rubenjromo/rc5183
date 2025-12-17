@@ -246,13 +246,13 @@ def display_scatter_tab(df_analisis_scatter):
     st.header("Gráficos de Dispersión")
     st.info("Estos gráficos muestran la relación causa - efecto entre una variable explicativa (eje X) y las propiedades del papel (eje Y). La línea punteada roja indica la tendencia lineal.")
     
-    st.subheader("1. Variables de Proceso vs. Propiedades")
+    st.subheader("Variables de Proceso vs. Propiedades")
     plot_scatter_relationships_for_tab(df_analisis_scatter, 'DOSIFICACIÓN', PROPIEDADES_PAPEL)
     plot_scatter_relationships_for_tab(df_analisis_scatter, 'VELOCIDAD', PROPIEDADES_PAPEL)
     if 'ALMIDÓN' in df_analisis_scatter.columns:
         plot_scatter_relationships_for_tab(df_analisis_scatter, 'ALMIDÓN', PROPIEDADES_PAPEL)
     
-    st.subheader("2. Variables Nuevas vs. Propiedades")
+  
     if 'LABIO' in df_analisis_scatter.columns:
         plot_scatter_relationships_for_tab(df_analisis_scatter, 'LABIO', PROPIEDADES_PAPEL)
     if 'CHORRO' in df_analisis_scatter.columns:
@@ -260,7 +260,7 @@ def display_scatter_tab(df_analisis_scatter):
     if 'COLUMNA' in df_analisis_scatter.columns:
         plot_scatter_relationships_for_tab(df_analisis_scatter, 'COLUMNA', PROPIEDADES_PAPEL)
 
-    st.subheader("3. Propiedades Clave vs. otras Propiedades (Pares)")
+    
     plot_scatter_relationships_for_tab(df_analisis_scatter, 'PESO', ['SCT', 'CMT', 'MULLEN', 'COBB']) 
     plot_scatter_relationships_for_tab(df_analisis_scatter, 'SCT', ['CMT', 'MULLEN', 'POROSIDAD'])
 
