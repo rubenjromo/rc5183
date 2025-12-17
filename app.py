@@ -110,7 +110,7 @@ def load_and_preprocess_data(uploaded_file):
 # ==============================================================================
 
 def display_dataframe_tab(df_analisis):
-    st.header("DataFrame de Datos Limpios")
+    st.header("Base de Datos")
     st.info("Vista de las primeras y últimas filas del conjunto de datos.")
     
     cols_to_show = [c for c in COLUMNS_OF_INTEREST if c in df_analisis.columns]
