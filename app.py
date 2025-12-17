@@ -321,7 +321,7 @@ def run_ols_analysis_clean(df, dependent_var):
 
         st.markdown("\n" + "=" * 60)
         st.markdown(f"## Análisis de Regresión Múltiple: {dependent_var} (OLS)")
-        st.markdown(f"**Fórmula:** `{formula}`")
+        st.markdown(f"**Expresión:** `{formula}`")
         st.markdown("=" * 60)
 
         # 1. Resumen General
@@ -387,7 +387,7 @@ def display_regression_tab(df_analisis_ols):
 
 def display_averages_tab(df_analisis):
     st.header("Promedios de Variables por Gramaje")
-    st.info("Esta tabla muestra el valor promedio de cada propiedad y variable de proceso para cada tipo de **GRAMAJE** presente en sus datos.")
+    st.info("Esta tabla muestra el valor promedio de cada propiedad y variable de proceso para cada tipo de **gramaje** presente en sus datos.")
     
     if 'GRAMAJE' not in df_analisis.columns or df_analisis['GRAMAJE'].isnull().all():
         st.warning("La columna 'GRAMAJE' no se encontró o está completamente vacía. No se puede realizar la agrupación.")
@@ -428,7 +428,7 @@ def main():
     # --- BARRA LATERAL PARA CARGA ---
     with st.sidebar:
         st.header("⚙️ Carga de Datos")
-        st.info("Sube tu archivo CSV.")
+        st.info("Subir archivo CSV.")
         uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
         
         if uploaded_file is None:
@@ -437,7 +437,7 @@ def main():
     # --- CONTENIDO PRINCIPAL ---
     
     if uploaded_file is None:
-        st.markdown("Favor subir el archivo CSV en la barra lateral izquierda para iniciar el análisis completo.")
+        st.markdown("Favor subir el archivo CSV en la barra lateral izquierda para iniciar el análisis.")
         return
 
     df_analisis, df_analisis_ols, df_analisis_scatter = load_and_preprocess_data(uploaded_file)
