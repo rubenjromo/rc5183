@@ -272,7 +272,7 @@ def display_boxplots_tab(df_analisis):
         st.warning("La columna 'GRAMAJE' es requerida para estos gráficos.")
         return
 
-    properties_to_plot = ['MULLEN', 'SCT', 'CMT']
+    properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
     
     fig, axes = plt.subplots(len(properties_to_plot), 1, figsize=(10, 5 * len(properties_to_plot)))
     
