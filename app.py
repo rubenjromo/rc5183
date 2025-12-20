@@ -274,7 +274,10 @@ def main():
             st.subheader("Filtro de Análisis")
             sel = st.selectbox("Seleccione el Gramaje a analizar:", ["TODO"] + gramajes_enteros)
         
-        df_filtro = df_full.copy() if sel == "TODO" else df_full[df_full['GRAMAJE'] == sel].copy()
+        if sel == "TODO":
+          df_filtro = df_full.copy()
+        else:
+          df_filtro = df_full[pd.to_numeric(df_full['GRAMAJE'], errors='coerce').fillna(-1).astype(int) == sel].copy()
         
         # Preparación de datos (Imputación por media para análisis estadístico)
         df_prep = df_filtro.copy()
