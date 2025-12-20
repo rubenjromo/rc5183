@@ -197,7 +197,7 @@ def display_boxplots_tab(df_full):
     referencias_calidad = {
         '185': {
             'SCT': {'min': 3.20, 'std': 3.40},
-            'CMT': {'min': 34.0, 'std': 36.0},
+            'CMT': {'min': 36.0, 'std': 36.0},
             'MULLEN': {'min': 210, 'std': 230},
             'POROSIDAD': {'min': 80, 'std': 95}
         },
@@ -227,17 +227,17 @@ def display_boxplots_tab(df_full):
                     val_std = referencias_calidad[gramaje][prop]['std']
                     
                     # 1. Punto Rojo (Mínimo)
-                    ax.plot(i, val_min, marker='o', color='red', markersize=8, label='Mínimo' if i==0 else "")
+                    ax.plot(i, val_min, marker='o', color='red', markersize=10, label='Mínimo' if i==0 else "")
                     # Etiqueta de texto para el mínimo
                     ax.text(i + 0.1, val_min, f'Min: {val_min}', color='red', fontweight='bold', va='center')
                     
                     # 2. Punto Verde (Estándar)
-                    ax.plot(i, val_std, marker='o', color='green', markersize=8, label='Estándar' if i==0 else "")
+                    ax.plot(i, val_std, marker='o', color='green', markersize=10, label='Estándar' if i==0 else "")
                     # Etiqueta de texto para el estándar
                     ax.text(i + 0.1, val_std, f'Std: {val_std}', color='green', fontweight='bold', va='center')
 
-            ax.set_title(f'Distribución de {prop} por Gramaje vs Objetivos')
-            ax.set_ylabel('Valor Medido')
+            ax.set_title(f'Distribución de {prop} por Gramaje')
+            ax.set_ylabel(f'{prop}')
             ax.set_xlabel('Gramaje')
             
             # Ajustar los márgenes para que las etiquetas de texto no se corten
