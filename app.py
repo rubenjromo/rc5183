@@ -177,10 +177,12 @@ def display_scatter_tab(df):
     st.header("Gráficos de Dispersión")
     st.info("Estos gráficos muestran la relación causa - efecto entre una variable explicativa (eje X) y las propiedades del papel (eje Y). La línea punteada roja indica la tendencia lineal.")
 
+    propiedades_sin_peso = [p for p in PROPIEDADES_PAPEL if p != 'PESO']
+
     variables_eje_x = ['DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']
     for var in variables_eje_x:
-      if var in df.columns and var != 'PESO':
-        plot_scatter_relationships_for_tab(df, var, PROPIEDADES_PAPEL)
+      if var in df.columns:
+        plot_scatter_relationships_for_tab(df, var, propiedades_sin_peso)
         
     st.markdown("---")
     st.markdown("### Relaciones Específicas entre Propiedades")
