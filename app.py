@@ -190,19 +190,59 @@ def display_scatter_tab(df):
     plot_scatter_relationships_for_tab(df, 'SCT', ['CMT', 'MULLEN', 'POROSIDAD'])
 
 def display_boxplots_tab(df_full):
-    st.header("Boxplots por Gramaje")
-    st.info("Los boxplots muestran la distribución (media, cuartiles y atípicos) de las propiedades clave en función del gramaje.")
+    st.header("Boxplots por Gramaje con Objetivos de Calidad")
+    st.info("🔴 Rojo: Valor Mínimo | 🟢 Verde: Valor Estandar")
+    
+    # --- DICCIONARIO DE REFERENCIAS (RELLENA CON TUS VALORES REALES) ---
+    referencias_calidad = {
+        '185': {
+            'SCT': {'min': 3.20, 'std': 3.40},
+            'CMT': {'min': 34.0, 'std': 36.0},
+            'MULLEN': {'min': 210, 'std': 230},
+            'POROSIDAD': {'min': 80, 'std': 95}
+        },
+        '195': {
+            'SCT': {'min': 3.40, 'std': 3.65},
+            'CMT': {'min': 35.0, 'std': 38.0},
+            'MULLEN': {'min': 230, 'std': 250},
+            'POROSIDAD': {'min': 90, 'std': 105}
+        }
+    }
+
     properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
-    fig, axes = plt.subplots(len(properties_to_plot), 1, figsize=(10, 5 * len(properties_to_plot)))
-    if len(properties_to_plot) == 1: axes = [axes]
-    for i, prop in enumerate(properties_to_plot):
+    gramajes_eje_x = sorted(df_full['GRAMAJE'].unique())
+
+    for prop in properties_to_plot:
         if prop in df_full.columns:
-            sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=axes[i])
-            sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.6, ax=axes[i])
-            axes[i].set_title(f'Distribución de {prop} por Gramaje')
-            axes[i].grid(axis='y', linestyle='--')
-    plt.tight_layout()
-    st.pyplot(fig); plt.close(fig)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Dibujar Boxplot y Swarmplot base
+            sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=ax, width=0.6)
+            sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.4, ax=ax)
+            
+            # Dibujar los puntos de referencia
+            for i, gramaje in enumerate(gramajes_eje_x):
+                if gramaje in referencias_calidad and prop in referencias_calidad[gramaje]:
+                    val_min = referencias_calidad[gramaje][prop]['min']
+                    val_std = referencias_calidad[gramaje][prop]['std']
+                    
+                    # 1. Punto Rojo (Mínimo)
+                    ax.plot(i, val_min, marker='o', color='red', markersize=8, label='Mínimo' if i==0 else "")
+                    # Etiqueta de texto para el mínimo
+                    ax.text(i + 0.1, val_min, f'Min: {val_min}', color='red', fontweight='bold', va='center')
+                    
+                    # 2. Punto Verde (Estándar)
+                    ax.plot(i, val_std, marker='o', color='green', markersize=8, label='Estándar' if i==0 else "")
+                    # Etiqueta de texto para el estándar
+                    ax.text(i + 0.1, val_std, f'Std: {val_std}', color='green', fontweight='bold', va='center')
+
+            ax.set_title(f'Distribución de {prop} por Gramaje vs Objetivos')
+            ax.set_ylabel('Valor Medido')
+            ax.set_xlabel('Gramaje')
+            
+            # Ajustar los márgenes para que las etiquetas de texto no se corten
+            plt.tight_layout()
+            st.pyplot(fig); plt.close(fig)
 
 def run_ols_analysis_clean(df, dependent_var):
     model_cols = [dependent_var, 'DOSIFICACIÓN', 'VELOCIDAD', 'PESO', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']
