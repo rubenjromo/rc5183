@@ -266,11 +266,13 @@ def main():
     df_full = load_and_preprocess_data(uploaded_file)
 
     if df_full is not None:
-        # --- FILTRO POR GRAMAJE (NUEVA ADICIÓN) ---
-        gramajes = sorted(df_full['GRAMAJE'].unique())
+        # --- FILTRO POR GRAMAJE ---
+        gramajes_crudos = df_full['GRAMAJE'].unique()
+        gramajes_enteros = sorted([int(float(g)) for g in gramajes_crudos if str(g).replace('.','').isdigit()])
+      
         with st.sidebar:
             st.subheader("Filtro de Análisis")
-            sel = st.selectbox("Seleccione el Gramaje a analizar:", ["TODO"] + list(gramajes))
+            sel = st.selectbox("Seleccione el Gramaje a analizar:", ["TODO"] + gramajes_enteros)
         
         df_filtro = df_full.copy() if sel == "TODO" else df_full[df_full['GRAMAJE'] == sel].copy()
         
@@ -284,7 +286,7 @@ def main():
 
         # --- TABS ORIGINALES ---
         tab_df, tab_corr, tab_reel, tab_scatter, tab_boxplots, tab_reg, tab_avg = st.tabs([
-            "📋 DataFrame / Distribución", "🔗 Correlación", "📈 Variación vs. REEL", 
+            "📋 Datos / Distribución", "🔗 Correlación", "📈 Variación vs. REEL", 
             "⚫ Dispersión", "📦 Boxplots por Gramaje", "🔬 Regresiones (OLS)", "🔢 Promedios"
         ])
         
