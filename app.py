@@ -193,24 +193,23 @@ def display_boxplots_tab(df_full):
     st.header("Boxplots por Gramaje")
     st.info("🔴 Rojo: Valor Mínimo de Calidad | 🟢 Verde: Valor Estándar de Laboratorio")
     
-    # Explicación técnica del Boxplot restaurada
     with st.expander("ℹ️ ¿Cómo interpretar este gráfico?"):
         st.markdown("""
         * **Caja central**: Representa el Rango Intercuartílico (RIC), donde se encuentra el 50% de los datos centrales.
-        * **Línea interna**: Es la **Mediana**. Divide los datos en dos partes iguales.
-        * **Bigotes (Whiskers)**: Se extienden hasta 1.5 veces el RIC. Los puntos fuera de ellos son valores atípicos.
-        * **Puntos Negros (Swarm)**: Son los datos reales de cada REEL para ver la densidad.
+        * **Línea interna**: Es la **Mediana**.
+        * **Puntos Negros (Swarm)**: Datos reales de cada REEL.
         """)
     
     # --- DICCIONARIO DE REFERENCIAS ---
+    # Usamos números como llaves para facilitar la comparación numérica
     referencias_calidad = {
-        '185': {
+        185: {
             'SCT': {'min': 3.20, 'std': 3.40},
             'CMT': {'min': 36.0, 'std': 36.0},
             'MULLEN': {'min': 210, 'std': 230},
             'POROSIDAD': {'min': 80, 'std': 95}
         },
-        '195': {
+        195: {
             'SCT': {'min': 3.40, 'std': 3.65},
             'CMT': {'min': 35.0, 'std': 38.0},
             'MULLEN': {'min': 230, 'std': 250},
@@ -219,44 +218,48 @@ def display_boxplots_tab(df_full):
     }
 
     properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
-    # Aseguramos que los gramajes del eje X sean consistentes
     gramajes_eje_x = sorted(df_full['GRAMAJE'].unique())
 
     for prop in properties_to_plot:
         if prop in df_full.columns:
             fig, ax = plt.subplots(figsize=(10, 6))
             
-            # 1. Dibujar Boxplot y Swarmplot (Base)
+            # 1. Dibujar Boxplot y Swarmplot
             sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=ax, width=0.5)
             sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.4, ax=ax)
             
-            # 2. Dibujar los puntos de referencia con ZORDER alto para que queden al frente
+            # 2. Dibujar los puntos de referencia
             for i, gramaje in enumerate(gramajes_eje_x):
-                g_key = str(gramaje).strip() # Limpiamos espacios para coincidir con el diccionario
-                
-                if g_key in referencias_calidad and prop in referencias_calidad[g_key]:
-                    val_min = referencias_calidad[g_key][prop]['min']
-                    val_std = referencias_calidad[g_key][prop]['std']
+                try:
+                    # FORZAMOS el gramaje a entero para asegurar que 185.0 o "185" sean 185
+                    g_int = int(float(gramaje))
                     
-                    # Punto Rojo (Mínimo) - s=150 es el tamaño
-                    ax.scatter(i, val_min, color='red', s=150, edgecolors='black', 
-                               label='Mínimo' if i==0 else "", zorder=5)
-                    ax.text(i + 0.12, val_min, f'Min: {val_min}', color='red', 
-                            fontweight='bold', va='center', zorder=6)
-                    
-                    # Punto Verde (Estándar)
-                    ax.scatter(i, val_std, color='green', s=150, edgecolors='black', 
-                               label='Estándar' if i==0 else "", zorder=5)
-                    ax.text(i + 0.12, val_std, f'Std: {val_std}', color='green', 
-                            fontweight='bold', va='center', zorder=6)
+                    if g_int in referencias_calidad and prop in referencias_calidad[g_int]:
+                        val_min = referencias_calidad[g_int][prop]['min']
+                        val_std = referencias_calidad[g_int][prop]['std']
+                        
+                        # Usamos scatter con zorder=10 para que flote sobre todo
+                        ax.scatter(i, val_min, color='red', s=180, edgecolors='white', 
+                                   linewidth=2, label='Mínimo' if i==0 else "", zorder=10)
+                        ax.text(i + 0.12, val_min, f'Min: {val_min}', color='red', 
+                                fontweight='bold', va='center', zorder=11, fontsize=11)
+                        
+                        ax.scatter(i, val_std, color='green', s=180, edgecolors='white', 
+                                   linewidth=2, label='Estándar' if i==0 else "", zorder=10)
+                        ax.text(i + 0.12, val_std, f'Std: {val_std}', color='green', 
+                                fontweight='bold', va='center', zorder=11, fontsize=11)
+                except:
+                    continue # Si el gramaje no es un número válido, saltar
 
             ax.set_title(f'Distribución de {prop} por Gramaje')
             ax.set_ylabel(f'{prop}')
             ax.set_xlabel('Gramaje')
             
-            # 3. Ajuste dinámico del eje Y para que los puntos siempre sean visibles
-            y_low, y_high = ax.get_ylim()
-            ax.set_ylim(y_low * 0.95, y_high * 1.05)
+            # Forzar a que el eje Y incluya los puntos aunque estén lejos de los datos
+            y_min_data = df_full[prop].min()
+            y_max_data = df_full[prop].max()
+            # Si hay datos de referencia para este gramaje, incluirlos en el cálculo del límite
+            ax.margins(y=0.15) 
             
             plt.tight_layout()
             st.pyplot(fig); plt.close(fig)
