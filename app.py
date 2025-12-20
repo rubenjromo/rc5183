@@ -205,15 +205,15 @@ def display_boxplots_tab(df_full):
     referencias_calidad = {
         185: {
             'SCT': {'min': 3.20, 'std': 3.40},
-            'CMT': {'min': 36.0, 'std': 36.0},
-            'MULLEN': {'min': 210, 'std': 230},
-            'POROSIDAD': {'min': 80, 'std': 95}
+            'CMT': {'min': 35.0, 'std': 36.0},
+            'MULLEN': {'min': 68, 'std': 72},
+            'POROSIDAD': {'min': 70, 'std': 75}
         },
         195: {
             'SCT': {'min': 3.40, 'std': 3.65},
             'CMT': {'min': 35.0, 'std': 38.0},
-            'MULLEN': {'min': 230, 'std': 250},
-            'POROSIDAD': {'min': 90, 'std': 105}
+            'MULLEN': {'min': 72, 'std': 76},
+            'POROSIDAD': {'min': 75, 'std': 80}
         }
     }
 
@@ -242,12 +242,12 @@ def display_boxplots_tab(df_full):
                         ax.scatter(i, val_min, color='red', s=180, edgecolors='white', 
                                    linewidth=2, label='Mínimo' if i==0 else "", zorder=10)
                         ax.text(i + 0.12, val_min, f'Min: {val_min}', color='red', 
-                                fontweight='bold', va='center', zorder=11, fontsize=11)
+                                fontweight='bold', va='center', zorder=11, fontsize=10)
                         
                         ax.scatter(i, val_std, color='green', s=180, edgecolors='white', 
                                    linewidth=2, label='Estándar' if i==0 else "", zorder=10)
                         ax.text(i + 0.12, val_std, f'Std: {val_std}', color='green', 
-                                fontweight='bold', va='center', zorder=11, fontsize=11)
+                                fontweight='bold', va='center', zorder=11, fontsize=10)
                 except:
                     continue # Si el gramaje no es un número válido, saltar
 
