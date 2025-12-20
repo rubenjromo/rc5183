@@ -57,204 +57,172 @@ def load_and_preprocess_data(uploaded_file):
                 if temp_df.iloc[i].iloc[:15].astype(str).str.contains('REEL', case=False, na=False).any():
                     header_row_index = i
                     break
-
-        if header_row_index == -1:
-            return None, None, None
-
+        if header_row_index == -1: return None
         uploaded_file.seek(0)
         df = pd.read_csv(uploaded_file, encoding='latin1', header=header_row_index, sep=';')
         df = make_columns_unique_and_clean(df)
-        df = df.dropna(axis=1, how='all')
-
-        if 'HORA' in df.columns:
-            df.rename(columns={'HORA': 'ALMIDÓN'}, inplace=True)
-        
-        df = make_columns_unique_and_clean(df)
-
-        # Conversión numérica
+        if 'HORA' in df.columns: df.rename(columns={'HORA': 'ALMIDÓN'}, inplace=True)
         for col in [c for c in COLUMNS_OF_INTEREST if c != 'GRAMAJE']:
             if col in df.columns:
                 col_array_str = df[col].astype(str).str.replace(',', '.', regex=False).str.strip()
                 df[col] = pd.to_numeric(col_array_str, errors='coerce')
-
         df_limpio = df.dropna(subset=['REEL']).copy()
-        df_limpio.replace([np.inf, -np.inf], np.nan, inplace=True)
         df_analisis = df_limpio[df_limpio['REEL'] > 0].copy()
-
-        # Limpieza de GRAMAJE para asegurar que el filtro funcione bien
         if 'GRAMAJE' in df_analisis.columns:
             df_analisis['GRAMAJE'] = df_analisis['GRAMAJE'].astype(str).str.strip()
-
         return df_analisis
     except Exception as e:
         st.error(f"Error: {e}")
         return None
 
 # ==============================================================================
-# FUNCIONES DE APOYO PARA PESTAÑAS (Mantenidas según código original)
+# 2. FUNCIONES DE REGRESIÓN (RESTAURADAS)
 # ==============================================================================
 
-def plot_distribution_histograms(df):
-    cols_for_hist = [c for c in PROPIEDADES_PAPEL + VARIABLES_NUEVAS if c in df.columns and df[c].dtype in ['float64', 'int64']]
-    if cols_for_hist:
-        num_cols = len(cols_for_hist)
-        fig_cols = min(3, num_cols)
-        fig_rows = int(np.ceil(num_cols / fig_cols))
-        fig, axes = plt.subplots(fig_rows, fig_cols, figsize=(4 * fig_cols, 4 * fig_rows)) 
-        axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
-        df.loc[:, cols_for_hist].hist(bins=10, edgecolor='black', color='skyblue', ax=axes[:num_cols])
-        for i in range(num_cols, len(axes)): fig.delaxes(axes[i])
-        plt.suptitle('Distribución de Frecuencia', y=1.02, fontsize=14)
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+def run_ols_analysis_clean(df, dependent_var):
+    """Ejecuta el análisis OLS completo con formato detallado."""
+    model_cols = [dependent_var, 'DOSIFICACIÓN', 'VELOCIDAD', 'PESO', 'ALMIDÓN',
+                  'LABIO', 'CHORRO', 'COLUMNA']
+    model_cols_present = [col for col in model_cols if col in df.columns and df[col].nunique() > 1]
+    
+    model_df = df[model_cols_present].dropna().copy()
 
-def display_dataframe_tab(df_analisis):
-    st.header("Base de Datos")
-    col1, col2 = st.columns(2)
-    cols_to_show = [c for c in COLUMNS_OF_INTEREST if c in df_analisis.columns]
-    with col1: st.markdown("### Primeras Filas"); st.dataframe(df_analisis[cols_to_show].head(), use_container_width=True)
-    with col2: st.markdown("### Últimas Filas"); st.dataframe(df_analisis[cols_to_show].tail(), use_container_width=True)
-    st.markdown("---")
-    plot_distribution_histograms(df_analisis)
+    if len(model_cols_present) < 2 or model_df.empty:
+        st.warning(f"No hay suficientes datos para la regresión múltiple de **{dependent_var}**.")
+        return
+
+    formula_components = [c for c in model_cols_present if c != dependent_var]
+    formula = f'{dependent_var} ~ ' + ' + '.join(formula_components)
+
+    try:
+        model = ols(formula, data=model_df).fit()
+
+        st.markdown("\n" + "-" * 30)
+        st.markdown(f"## Análisis de Regresión Múltiple: {dependent_var} (OLS)")
+        st.markdown(f"**Expresión:** `{formula}`")
+
+        # 1. Resumen General
+        st.markdown("### Resumen del Modelo")
+        metrics = [
+            ["**R-cuadrado Ajustado**", f"{model.rsquared_adj:.3f}", f"{model.rsquared_adj*100:.1f}% de la variación explicada."],
+            ["Prob(F-statistic)", f"{model.f_pvalue:.4e}", "Significancia global (< 0.05 es bueno)."],
+            ["Observaciones", f"{int(model.nobs)}", "Filas usadas."]
+        ]
+        st.markdown(tabulate(metrics, headers=["Métrica", "Valor", "Interpretación"], tablefmt="pipe"))
+
+        # 2. Tabla de Coeficientes
+        results = []
+        results.append(["Intercepto", model.params['Intercept'], model.pvalues['Intercept'], 'N/A', 'N/A'])
+
+        for var in formula_components:
+            coef = model.params.get(var)
+            p_val = model.pvalues.get(var)
+            signif = "**SÍ**" if p_val < 0.05 else "NO"
+            interp = f"Significativo. Delta de {coef:.4f} por unidad." if p_val < 0.05 else "No significativo."
+            results.append([var, coef, p_val, signif, interp])
+
+        st.markdown("\n### Coeficientes del Modelo")
+        st.markdown(tabulate(results, headers=["Variable", "Coef", "P-valor", "Sig.", "Interpretación"], 
+                             floatfmt=(".0f", ".4f", ".4f", "", ""), tablefmt="pipe"))
+
+        # 3. Ecuación
+        st.markdown("\n### Ecuación de Regresión")
+        eq = f"**{dependent_var}** = {model.params['Intercept']:.4f}"
+        for var in formula_components:
+            coef = model.params.get(var)
+            sign = "+" if coef >= 0 else "-"
+            eq += f" {sign} {abs(coef):.4f} x **{var}**"
+        st.code(eq)
+
+    except Exception as e:
+        st.error(f"Error en regresión de {dependent_var}: {e}")
+
+# ==============================================================================
+# 3. FUNCIONES DE VISUALIZACIÓN (Mantenidas)
+# ==============================================================================
+
+def display_dataframe_tab(df):
+    st.header("Vista de Datos")
+    cols = [c for c in COLUMNS_OF_INTEREST if c in df.columns]
+    st.dataframe(df[cols].head(10), use_container_width=True)
 
 def display_correlation_tab(df):
     st.header("Matriz de Correlación")
-    existing_features = [f for f in TODAS_LAS_VARIABLES if f in df.columns and df[f].nunique() > 1]
-    if len(existing_features) < 2: return
-    corr_matrix = df[existing_features].corr()
+    feats = [f for f in TODAS_LAS_VARIABLES if f in df.columns and df[f].nunique() > 1]
+    if len(feats) < 2: return
     fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
-    st.pyplot(fig)
-    plt.close(fig)
+    sns.heatmap(df[feats].corr(), annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+    st.pyplot(fig); plt.close(fig)
 
 def display_reel_vs_tab(df):
-    st.header("Variación vs. REEL")
-    existing_features = [f for f in PROPIEDADES_PAPEL if f in df.columns]
-    n_features = len(existing_features)
-    if n_features == 0: return
-    fig, axes = plt.subplots(n_features, 1, figsize=(12, 3 * n_features), sharex=True)
-    if n_features == 1: axes = [axes]
-    for i, feature in enumerate(existing_features):
-        sns.lineplot(x='REEL', y=feature, data=df, ax=axes[i], marker='o', color='darkblue')
-        axes[i].set_ylabel(feature)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
-
-def plot_scatter_relationships_for_tab(df, x_col, y_cols):
-    existing_y_cols = [y for y in y_cols if y in df.columns and df[y].nunique() > 1]
-    if x_col not in df.columns or not existing_y_cols: return
-    st.markdown(f"#### Dispersión: Propiedades vs. `{x_col}`")
-    n_plots = len(existing_y_cols)
-    cols = 2
-    rows = (n_plots + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(14, 4 * rows))
-    axes = axes.flatten()
-    for i, y_col in enumerate(existing_y_cols):
-        sns.scatterplot(x=x_col, y=y_col, data=df, ax=axes[i], color='teal')
-        try: sns.regplot(x=x_col, y=y_col, data=df, ax=axes[i], scatter=False, color='red', line_kws={'linestyle':'--'})
-        except: pass
-        axes[i].set_title(f'{y_col} vs {x_col}')
-    for i in range(n_plots, len(axes)): fig.delaxes(axes[i])
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
+    st.header("Variación por REEL")
+    feats = [f for f in PROPIEDADES_PAPEL if f in df.columns]
+    fig, axes = plt.subplots(len(feats), 1, figsize=(12, 3*len(feats)), sharex=True)
+    if len(feats) == 1: axes = [axes]
+    for i, f in enumerate(feats):
+        sns.lineplot(x='REEL', y=f, data=df, ax=axes[i], marker='o')
+    st.pyplot(fig); plt.close(fig)
 
 def display_scatter_tab(df):
     st.header("Gráficos de Dispersión")
-    for var in ['DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']:
-        if var in df.columns: plot_scatter_relationships_for_tab(df, var, PROPIEDADES_PAPEL)
-    plot_scatter_relationships_for_tab(df, 'PESO', ['SCT', 'CMT', 'MULLEN', 'COBB'])
+    for x in ['DOSIFICACIÓN', 'VELOCIDAD', 'PESO']:
+        if x in df.columns:
+            ys = [p for p in PROPIEDADES_PAPEL if p in df.columns and p != x]
+            fig, axes = plt.subplots(1, len(ys), figsize=(16, 4))
+            if len(ys) == 1: axes = [axes]
+            for i, y in enumerate(ys):
+                sns.scatterplot(x=x, y=y, data=df, ax=axes[i])
+                sns.regplot(x=x, y=y, data=df, ax=axes[i], scatter=False, color='red')
+            st.pyplot(fig); plt.close(fig)
 
-def display_boxplots_tab(df):
-    st.header("Boxplots por Gramaje")
-    if 'GRAMAJE' not in df.columns: return
-    props = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
-    for prop in [p for p in props if p in df.columns]:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        sns.boxplot(x='GRAMAJE', y=prop, data=df, palette='viridis', ax=ax)
-        sns.swarmplot(x='GRAMAJE', y=prop, data=df, color='black', size=3, alpha=0.5, ax=ax)
-        st.pyplot(fig)
-        plt.close(fig)
+def display_boxplots_tab(df_full):
+    st.header("Distribución por Gramaje")
+    for p in ['SCT', 'CMT', 'MULLEN']:
+        if p in df_full.columns:
+            fig, ax = plt.subplots(figsize=(8, 4))
+            sns.boxplot(x='GRAMAJE', y=p, data=df_full, palette='Set2', ax=ax)
+            st.pyplot(fig); plt.close(fig)
 
-def run_ols_analysis_clean(df, dependent_var):
-    model_cols = [dependent_var, 'DOSIFICACIÓN', 'VELOCIDAD', 'PESO', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']
-    model_cols_present = [col for col in model_cols if col in df.columns and df[col].nunique() > 1]
-    if len(model_cols_present) < 2: return
-    formula = f'{dependent_var} ~ ' + ' + '.join([c for c in model_cols_present if c != dependent_var])
-    try:
-        model = ols(formula, data=df).fit()
-        st.markdown(f"### Regresión: {dependent_var}")
-        st.write(f"**R-cuadrado Adj:** {model.rsquared_adj:.3f} | **Observaciones:** {int(model.nobs)}")
-        # Simplificación de la tabla para visualización rápida
-        coeffs = pd.DataFrame({'Coef': model.params, 'P-valor': model.pvalues}).round(4)
-        st.table(coeffs)
-    except: st.warning(f"No se pudo calcular OLS para {dependent_var}")
-
-def display_regression_tab(df):
-    st.header("Modelos de Regresión (OLS)")
-    for prop in ['SCT', 'CMT', 'MULLEN']:
-        if prop in df.columns: run_ols_analysis_clean(df, prop)
-
-def display_averages_tab(df):
-    st.header("Promedios por Gramaje")
-    if 'GRAMAJE' in df.columns:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        avg_df = df.groupby('GRAMAJE')[numeric_cols].mean().round(2)
-        st.dataframe(avg_df)
+def display_averages_tab(df_full):
+    st.header("Promedios Históricos")
+    nums = df_full.select_dtypes(include=[np.number]).columns
+    st.dataframe(df_full.groupby('GRAMAJE')[nums].mean().round(2))
 
 # ==============================================================================
-# 3. FUNCIÓN PRINCIPAL CON FILTRO DE GRAMAJE
+# 4. MAIN
 # ==============================================================================
 
 def main():
-    st.title("Análisis Exploratorio y Regresión - Propiedades del Papel")
-    st.markdown("Pruebas con RC+5183")
-
+    st.title("Análisis de Propiedades del Papel")
     with st.sidebar:
-        st.header("⚙️ Configuración")
-        uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
+        file = st.file_uploader("Subir CSV", type="csv")
     
-    if uploaded_file:
-        df_full = load_and_preprocess_data(uploaded_file)
-        
+    if file:
+        df_full = load_and_preprocess_data(file)
         if df_full is not None:
-            # --- NUEVA LÓGICA DE FILTRO POR GRAMAJE ---
-            gramajes_disponibles = sorted(df_full['GRAMAJE'].unique())
-            opciones_filtro = ["TODO"] + list(gramajes_disponibles)
-            
+            gramajes = sorted(df_full['GRAMAJE'].unique())
             with st.sidebar:
-                st.subheader("Filtro de Análisis")
-                seleccion = st.selectbox("Seleccione el Gramaje a analizar:", opciones_filtro)
+                sel = st.selectbox("Filtrar por Gramaje:", ["TODO"] + list(gramajes))
             
-            # Aplicar filtro al DataFrame principal
-            if seleccion == "TODO":
-                df_filtrado = df_full.copy()
-                st.sidebar.success(f"Analizando base completa: {len(df_filtrado)} filas.")
-            else:
-                df_filtrado = df_full[df_full['GRAMAJE'] == seleccion].copy()
-                st.sidebar.success(f"Filtrado por Gramaje {seleccion}: {len(df_filtrado)} filas.")
-
-            # Preparar datos para OLS y Scatter (Imputación por media)
-            cols_to_impute = [c for c in COLUMNS_OF_INTEREST if c in df_filtrado.columns and c not in ['GRAMAJE', 'REEL']]
-            df_procesado = df_filtrado.copy()
-            for col in cols_to_impute:
-                df_procesado[col] = df_procesado[col].fillna(df_procesado[col].mean())
-
-            # --- TABS ---
-            tabs = st.tabs(["📋 Base", "🔗 Correlación", "📈 Variación", "⚫ Dispersión", "📦 Boxplots", "🔬 OLS", "🔢 Promedios"])
+            df_filtro = df_full.copy() if sel == "TODO" else df_full[df_full['GRAMAJE'] == sel].copy()
             
-            with tabs[0]: display_dataframe_tab(df_filtrado)
-            with tabs[1]: display_correlation_tab(df_procesado)
-            with tabs[2]: display_reel_vs_tab(df_filtrado)
-            with tabs[3]: display_scatter_tab(df_procesado)
-            with tabs[4]: display_boxplots_tab(df_full) # El boxplot usa el Full para comparar
-            with tabs[5]: display_regression_tab(df_procesado)
+            # Imputación para OLS y Correlación
+            df_ols = df_filtro.copy()
+            numeric_cols = df_ols.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                df_ols[col] = df_ols[col].fillna(df_ols[col].mean())
+
+            tabs = st.tabs(["📋 Datos", "🔗 Corr.", "📈 Reel", "⚫ Dispersión", "📦 Boxplots", "🔬 OLS", "🔢 Prom."])
+            
+            with tabs[0]: display_dataframe_tab(df_filtro)
+            with tabs[1]: display_correlation_tab(df_ols)
+            with tabs[2]: display_reel_vs_tab(df_filtro)
+            with tabs[3]: display_scatter_tab(df_ols)
+            with tabs[4]: display_boxplots_tab(df_full)
+            with tabs[5]: 
+                for p in ['SCT', 'CMT', 'MULLEN']:
+                    if p in df_ols.columns: run_ols_analysis_clean(df_ols, p)
             with tabs[6]: display_averages_tab(df_full)
-
-    else:
-        st.info("Favor subir el archivo CSV en la barra lateral.")
 
 if __name__ == '__main__':
     main()
