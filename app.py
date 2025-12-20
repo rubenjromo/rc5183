@@ -6,11 +6,11 @@ import numpy as np
 from statsmodels.formula.api import ols
 from tabulate import tabulate
 
-# Configuración inicial
+# Configuración inicial y estilo de la aplicación
 st.set_page_config(layout="wide", page_title="Análisis de Propiedades del Papel")
 sns.set_style("whitegrid")
 
-# Variables globales
+# Variables globales para referencia
 COLUMNS_OF_INTEREST = ['REEL', 'PESO', 'SCT', 'CMT', 'MULLEN', 'COBB', 'POROSIDAD',
                        'DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN',
                        'LABIO', 'CHORRO', 'COLUMNA', 'GRAMAJE']
@@ -20,11 +20,12 @@ VARIABLES_NUEVAS = ['LABIO', 'CHORRO', 'COLUMNA']
 TODAS_LAS_VARIABLES = PROPIEDADES_PAPEL + VARIABLES_PROCESO + VARIABLES_NUEVAS
 
 # ==============================================================================
-# 1. FUNCIONES DE CARGA Y LIMPIEZA
+# 1. FUNCIONES DE CARGA Y PREPROCESAMIENTO DE DATOS (CON CACHÉ)
 # ==============================================================================
 
 @st.cache_data
 def make_columns_unique_and_clean(df_input):
+    """Limpia y desduplica los nombres de columna."""
     df_output = df_input.copy()
     df_output.columns = df_output.columns.astype(str).str.strip().str.replace(r'[\n\r]', '', regex=True)
     new_cols_dict = {}
@@ -46,38 +47,70 @@ def make_columns_unique_and_clean(df_input):
     df_output.columns = new_cols
     return df_output
 
-@st.cache_data(show_spinner="Procesando datos...")
+@st.cache_data(show_spinner="Cargando y preprocesando datos...")
 def load_and_preprocess_data(uploaded_file):
+    """Carga, detecta el encabezado y preprocesa el DataFrame."""
     try:
         uploaded_file.seek(0)
-        temp_df = pd.read_csv(uploaded_file, encoding='latin1', header=None, sep=';', nrows=10)
+        temp_df = pd.read_csv(uploaded_file, encoding='latin1', header=None, sep=';', nrows=10, skip_blank_lines=False)
         header_row_index = -1
         for i in range(len(temp_df)):
             if not temp_df.iloc[i].isnull().all():
                 if temp_df.iloc[i].iloc[:15].astype(str).str.contains('REEL', case=False, na=False).any():
                     header_row_index = i
                     break
-        if header_row_index == -1: return None
+
+        if header_row_index == -1:
+            st.error("Error de Carga: No se pudo encontrar la fila de encabezado que contiene 'REEL'.")
+            return None
+
         uploaded_file.seek(0)
         df = pd.read_csv(uploaded_file, encoding='latin1', header=header_row_index, sep=';')
         df = make_columns_unique_and_clean(df)
-        if 'HORA' in df.columns: df.rename(columns={'HORA': 'ALMIDÓN'}, inplace=True)
+        df = df.dropna(axis=1, how='all')
+
+        if 'HORA' in df.columns:
+            df.rename(columns={'HORA': 'ALMIDÓN'}, inplace=True)
+        
+        df = make_columns_unique_and_clean(df)
+
         for col in [c for c in COLUMNS_OF_INTEREST if c != 'GRAMAJE']:
             if col in df.columns:
                 col_array_str = df[col].astype(str).str.replace(',', '.', regex=False).str.strip()
                 df[col] = pd.to_numeric(col_array_str, errors='coerce')
+
         df_limpio = df.dropna(subset=['REEL']).copy()
+        df_limpio.replace([np.inf, -np.inf], np.nan, inplace=True)
         df_analisis = df_limpio[df_limpio['REEL'] > 0].copy()
+
         if 'GRAMAJE' in df_analisis.columns:
-            df_analisis['GRAMAJE'] = df_analisis['GRAMAJE'].astype(str).str.strip()
+            df_analisis['GRAMAJE'] = df_analisis['GRAMAJE'].astype(str).str.strip().str.upper()
+
         return df_analisis
+
     except Exception as e:
         st.error(f"Error: {e}")
         return None
 
 # ==============================================================================
-# 2. SECCIONES DE VISUALIZACIÓN (RESTAURADAS AL 100%)
+# 2. SECCIONES (TABS) DEL ANÁLISIS
 # ==============================================================================
+
+def display_dataframe_tab(df_analisis):
+    st.header("Base de Datos")
+    st.info("Vista de las primeras y últimas filas del conjunto de datos.")
+    cols_to_show = [c for c in COLUMNS_OF_INTEREST if c in df_analisis.columns]
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### Primeras 5 Filas")
+        st.dataframe(df_analisis[cols_to_show].head(), use_container_width=True)
+    with col2:
+        st.markdown("### Últimas 5 Filas")
+        st.dataframe(df_analisis[cols_to_show].tail(5), use_container_width=True)
+    
+    st.markdown("### Distribución de Frecuencia de Variables")
+    plot_distribution_histograms(df_analisis)
 
 def plot_distribution_histograms(df):
     cols_for_hist = [c for c in PROPIEDADES_PAPEL + VARIABLES_NUEVAS if c in df.columns and df[c].dtype in ['float64', 'int64']]
@@ -89,22 +122,35 @@ def plot_distribution_histograms(df):
         axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
         df.loc[:, cols_for_hist].hist(bins=10, edgecolor='black', color='skyblue', ax=axes[:num_cols])
         for i in range(num_cols, len(axes)): fig.delaxes(axes[i])
-        plt.suptitle('Distribución de Frecuencia de Propiedades y Variables', y=1.02, fontsize=14)
+        plt.suptitle('Distribución de Frecuencia de Propiedades del Papel y Variables de Proceso', y=1.02, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.98])
         st.pyplot(fig); plt.close(fig)
 
-def display_dataframe_tab(df):
-    st.header("Base de Datos")
-    cols_to_show = [c for c in COLUMNS_OF_INTEREST if c in df.columns]
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### Primeras 5 Filas")
-        st.dataframe(df[cols_to_show].head(), use_container_width=True)
-    with col2:
-        st.markdown("### Últimas 5 Filas")
-        st.dataframe(df[cols_to_show].tail(), use_container_width=True)
-    st.markdown("### Distribución de Frecuencia")
-    plot_distribution_histograms(df)
+def display_correlation_tab(df_corr):
+    st.header("Matriz de Correlación")
+    st.info("El coeficiente de correlación (r) indica la fuerza y la dirección de la relación lineal entre dos variables. Valores cercanos a +1 o -1 indican una relación fuerte.")
+    existing_features = [f for f in TODAS_LAS_VARIABLES if f in df_corr.columns and df_corr[f].nunique() > 1]
+    if len(existing_features) < 2: return
+    corr_matrix = df_corr[existing_features].corr()
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5, linecolor='black', ax=ax)
+    ax.set_title('Matriz de Correlación Ampliada')
+    st.pyplot(fig); plt.close(fig)
+
+def display_reel_vs_tab(df_analisis):
+    st.header("Gráficos de Variación vs. REEL")
+    st.info("Estos gráficos de línea muestran cómo varían las propiedades clave a lo largo de los diferentes reels, ayudando a identificar tendencias o inestabilidad en el proceso.")
+    existing_features = [f for f in PROPIEDADES_PAPEL if f in df_analisis.columns]
+    if not existing_features: return
+    n_features = len(existing_features)
+    fig, axes = plt.subplots(n_features, 1, figsize=(12, 4 * n_features), sharex=True)
+    if n_features == 1: axes = [axes]
+    for i, feature in enumerate(existing_features):
+        sns.lineplot(x='REEL', y=feature, data=df_analisis, ax=axes[i], marker='o', color='darkblue')
+        axes[i].set_title(f'Variación de {feature} a lo largo de los REELs')
+        axes[i].grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    st.pyplot(fig); plt.close(fig)
 
 def plot_scatter_relationships_for_tab(df, x_col, y_cols):
     existing_y_cols = [y for y in y_cols if y in df.columns and df[y].nunique() > 1]
@@ -118,11 +164,6 @@ def plot_scatter_relationships_for_tab(df, x_col, y_cols):
     df_plot = df[[x_col] + existing_y_cols].dropna().copy()
     if x_col in VARIABLES_PROCESO + VARIABLES_NUEVAS:
         df_plot = df_plot[df_plot[x_col] != 0]
-    
-    if df_plot.empty:
-        st.warning(f"No hay datos para graficar vs {x_col}")
-        return
-
     for i, y_col in enumerate(existing_y_cols):
         sns.scatterplot(x=x_col, y=y_col, data=df_plot, ax=axes[i], alpha=0.7, color='teal')
         try: sns.regplot(x=x_col, y=y_col, data=df_plot, ax=axes[i], scatter=False, color='red', line_kws={'linestyle':'--'})
@@ -134,14 +175,26 @@ def plot_scatter_relationships_for_tab(df, x_col, y_cols):
 
 def display_scatter_tab(df):
     st.header("Gráficos de Dispersión")
+    st.info("Estos gráficos muestran la relación causa - efecto entre una variable explicativa (eje X) y las propiedades del papel (eje Y). La línea punteada roja indica la tendencia lineal.")
     for var in ['DOSIFICACIÓN', 'VELOCIDAD', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']:
-        if var in df.columns: plot_scatter_relationships_for_tab(df, var, PROPIEDADES_PAPEL)
+        plot_scatter_relationships_for_tab(df, var, PROPIEDADES_PAPEL)
     plot_scatter_relationships_for_tab(df, 'PESO', ['SCT', 'CMT', 'MULLEN', 'COBB'])
     plot_scatter_relationships_for_tab(df, 'SCT', ['CMT', 'MULLEN', 'POROSIDAD'])
 
-# ==============================================================================
-# 3. REGRESIÓN OLS (RESTABLECIDA CON DETALLES)
-# ==============================================================================
+def display_boxplots_tab(df_full):
+    st.header("Boxplots por Gramaje")
+    st.info("Los boxplots muestran la distribución (media, cuartiles y atípicos) de las propiedades clave en función del gramaje.")
+    properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
+    fig, axes = plt.subplots(len(properties_to_plot), 1, figsize=(10, 5 * len(properties_to_plot)))
+    if len(properties_to_plot) == 1: axes = [axes]
+    for i, prop in enumerate(properties_to_plot):
+        if prop in df_full.columns:
+            sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=axes[i])
+            sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.6, ax=axes[i])
+            axes[i].set_title(f'Distribución de {prop} por Gramaje')
+            axes[i].grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    st.pyplot(fig); plt.close(fig)
 
 def run_ols_analysis_clean(df, dependent_var):
     model_cols = [dependent_var, 'DOSIFICACIÓN', 'VELOCIDAD', 'PESO', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']
@@ -149,113 +202,99 @@ def run_ols_analysis_clean(df, dependent_var):
     model_df = df[model_cols_present].dropna().copy()
     if len(model_cols_present) < 2 or model_df.empty: return
 
-    formula_components = [c for c in model_cols_present if c != dependent_var]
-    formula = f'{dependent_var} ~ ' + ' + '.join(formula_components)
-
+    formula = f'{dependent_var} ~ ' + ' + '.join([c for c in model_cols_present if c != dependent_var])
     try:
         model = ols(formula, data=model_df).fit()
         st.markdown("-" * 60)
         st.markdown(f"## Análisis de Regresión Múltiple: {dependent_var} (OLS)")
         st.markdown(f"**Expresión:** `{formula}`")
         
-        # Tabla resumen
+        st.markdown("### Resumen del Modelo")
         metrics = [["**R-cuadrado Ajustado**", f"{model.rsquared_adj:.3f}", f"{model.rsquared_adj*100:.1f}% explicado."],
-                   ["Prob(F-statistic)", f"{model.f_pvalue:.4e}", "Significancia global."],
-                   ["Observaciones", f"{int(model.nobs)}", "Total filas."]]
+                   ["Prob(F-statistic)", f"{model.f_pvalue:.4e}", "Nivel de significancia global."],
+                   ["Observaciones", f"{int(model.nobs)}", "Total de filas usadas."]]
         st.markdown(tabulate(metrics, headers=["Métrica", "Valor", "Interpretación"], tablefmt="pipe"))
 
-        # Coeficientes
         results = [["Intercepto", model.params['Intercept'], model.pvalues['Intercept'], 'N/A', 'N/A']]
-        for var in formula_components:
+        for var in [c for c in model_cols_present if c != dependent_var]:
             coef = model.params.get(var)
             p_val = model.pvalues.get(var)
             signif = "**SÍ**" if p_val < 0.05 else "NO"
-            interp = f"Significativo. Delta {coef:.4f}." if p_val < 0.05 else "No significativo."
-            results.append([var, coef, p_val, signif, interp])
+            results.append([var, coef, p_val, signif, f"Varía {coef:.4f} por unidad" if p_val < 0.05 else "No significativo"])
         
         st.markdown("### Coeficientes del Modelo")
-        st.markdown(tabulate(results, headers=["Variable", "Coef", "P-valor", "Sig.", "Interpretación"], floatfmt=(".0f", ".4f", ".4f", "", ""), tablefmt="pipe"))
+        st.markdown(tabulate(results, headers=["Variable", "Coeficiente", "P-valor", "Significativo", "Interpretación"], floatfmt=(".0f", ".4f", ".4f", "", ""), tablefmt="pipe"))
 
-        # Ecuación
         eq = f"**{dependent_var}** = {model.params['Intercept']:.4f}"
-        for var in formula_components:
+        for var in [c for c in model_cols_present if c != dependent_var]:
             coef = model.params.get(var)
-            sign = "+" if coef >= 0 else "-"
-            eq += f" {sign} {abs(coef):.4f} x **{var}**"
+            eq += f" {'+' if coef >= 0 else '-'} {abs(coef):.4f} x **{var}**"
         st.code(eq)
     except: pass
 
-# ==============================================================================
-# 4. RESTO DE FUNCIONES (CORRELACIÓN, REEL, BOXPLOT, AVG)
-# ==============================================================================
-
-def display_correlation_tab(df):
-    st.header("Matriz de Correlación")
-    feats = [f for f in TODAS_LAS_VARIABLES if f in df.columns and df[f].nunique() > 1]
-    if len(feats) < 2: return
-    fig, ax = plt.subplots(figsize=(12, 10))
-    sns.heatmap(df[feats].corr(), annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
-    st.pyplot(fig); plt.close(fig)
-
-def display_reel_vs_tab(df):
-    st.header("Variación vs. REEL")
-    feats = [f for f in PROPIEDADES_PAPEL if f in df.columns]
-    fig, axes = plt.subplots(len(feats), 1, figsize=(12, 4 * len(feats)), sharex=True)
-    if len(feats) == 1: axes = [axes]
-    for i, f in enumerate(feats):
-        sns.lineplot(x='REEL', y=f, data=df, ax=axes[i], marker='o', color='darkblue')
-        axes[i].set_ylabel(f)
-    plt.tight_layout()
-    st.pyplot(fig); plt.close(fig)
-
-def display_boxplots_tab(df_full):
-    st.header("Boxplots por Gramaje")
-    props = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
-    for p in [x for x in props if x in df_full.columns]:
-        fig, ax = plt.subplots(figsize=(10, 5))
-        sns.boxplot(x='GRAMAJE', y=p, data=df_full, palette='viridis', ax=ax)
-        sns.swarmplot(x='GRAMAJE', y=p, data=df_full, color='black', size=3, alpha=0.6, ax=ax)
-        st.pyplot(fig); plt.close(fig)
+def display_regression_tab(df):
+    st.header("Modelos de Regresión Múltiple (OLS)")
+    st.info("La Regresión de Mínimos Cuadrados Ordinarios (OLS) modela la relación lineal entre una propiedad y múltiples variables.")
+    for p in ['SCT', 'CMT', 'MULLEN']:
+        if p in df.columns: run_ols_analysis_clean(df, p)
 
 def display_averages_tab(df_full):
-    st.header("Promedios por Gramaje")
-    nums = df_full.select_dtypes(include=[np.number]).columns.drop('REEL', errors='ignore')
-    st.dataframe(df_full.groupby('GRAMAJE')[nums].mean().round(2))
+    st.header("Promedios de Variables por Gramaje")
+    st.info("Esta tabla muestra el valor promedio de cada propiedad para cada gramaje.")
+    num_cols = df_full.select_dtypes(include=[np.number]).columns.drop('REEL', errors='ignore')
+    avg_df = df_full.groupby('GRAMAJE')[num_cols].mean().round(2)
+    st.dataframe(avg_df)
 
 # ==============================================================================
-# 5. MAIN CON FILTRO
+# 3. FUNCIÓN PRINCIPAL
 # ==============================================================================
 
 def main():
-    st.title("Análisis de Datos Exploratorio - Propiedades del Papel")
-    with st.sidebar:
-        file = st.file_uploader("Subir archivo CSV", type="csv")
-    
-    if file:
-        df_full = load_and_preprocess_data(file)
-        if df_full is not None:
-            gramajes = sorted(df_full['GRAMAJE'].unique())
-            with st.sidebar:
-                sel = st.selectbox("Seleccione el Gramaje:", ["TODO"] + list(gramajes))
-            
-            df_filtro = df_full.copy() if sel == "TODO" else df_full[df_full['GRAMAJE'] == sel].copy()
-            
-            # Preparar datos (Imputación por media para gráficos de dispersión y OLS)
-            df_prep = df_filtro.copy()
-            for col in [c for c in COLUMNS_OF_INTEREST if c in df_prep.columns and c not in ['GRAMAJE', 'REEL']]:
-                df_prep[col] = df_prep[col].fillna(df_prep[col].mean())
+    st.title("Análisis de Datos Exploratorio y Regresión de Propiedades del Papel")
+    st.markdown("Pruebas con RC+5183")
 
-            tabs = st.tabs(["📋 Datos", "🔗 Correlación", "📈 Reel", "⚫ Dispersión", "📦 Boxplots", "🔬 OLS", "🔢 Promedios"])
-            
-            with tabs[0]: display_dataframe_tab(df_filtro)
-            with tabs[1]: display_correlation_tab(df_prep)
-            with tabs[2]: display_reel_vs_tab(df_filtro)
-            with tabs[3]: display_scatter_tab(df_prep)
-            with tabs[4]: display_boxplots_tab(df_full)
-            with tabs[5]: 
-                for p in ['SCT', 'CMT', 'MULLEN']:
-                    if p in df_prep.columns: run_ols_analysis_clean(df_prep, p)
-            with tabs[6]: display_averages_tab(df_full)
+    with st.sidebar:
+        st.header("⚙️ Carga de Datos")
+        uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
+        if uploaded_file is None:
+            st.warning("Esperando la carga de un archivo para comenzar el análisis.")
+
+    if uploaded_file is None:
+        st.markdown("Favor subir el archivo CSV en la barra lateral izquierda para iniciar el análisis.")
+        return
+
+    df_full = load_and_preprocess_data(uploaded_file)
+
+    if df_full is not None:
+        # --- FILTRO POR GRAMAJE (NUEVA ADICIÓN) ---
+        gramajes = sorted(df_full['GRAMAJE'].unique())
+        with st.sidebar:
+            st.subheader("Filtro de Análisis")
+            sel = st.selectbox("Seleccione el Gramaje a analizar:", ["TODO"] + list(gramajes))
+        
+        df_filtro = df_full.copy() if sel == "TODO" else df_full[df_full['GRAMAJE'] == sel].copy()
+        
+        # Preparación de datos (Imputación por media para análisis estadístico)
+        df_prep = df_filtro.copy()
+        cols_impute = [c for c in COLUMNS_OF_INTEREST if c in df_prep.columns and c not in ['GRAMAJE', 'REEL']]
+        for col in cols_impute:
+            df_prep[col] = df_prep[col].fillna(df_prep[col].mean())
+
+        st.success(f"Analizando: **{sel}** | Total filas: {len(df_filtro)}")
+
+        # --- TABS ORIGINALES ---
+        tab_df, tab_corr, tab_reel, tab_scatter, tab_boxplots, tab_reg, tab_avg = st.tabs([
+            "📋 DataFrame / Distribución", "🔗 Correlación", "📈 Variación vs. REEL", 
+            "⚫ Dispersión", "📦 Boxplots por Gramaje", "🔬 Regresiones (OLS)", "🔢 Promedios"
+        ])
+        
+        with tab_df: display_dataframe_tab(df_filtro)
+        with tab_corr: display_correlation_tab(df_prep)
+        with tab_reel: display_reel_vs_tab(df_filtro)
+        with tab_scatter: display_scatter_tab(df_prep)
+        with tab_boxplots: display_boxplots_tab(df_full) # Mantiene comparación global
+        with tab_reg: display_regression_tab(df_prep)
+        with tab_avg: display_averages_tab(df_full)
 
 if __name__ == '__main__':
     main()
