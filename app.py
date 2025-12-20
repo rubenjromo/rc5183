@@ -200,21 +200,47 @@ def display_boxplots_tab(df_full):
         * **Puntos Negros (Swarm)**: Datos reales de cada REEL.
         """)
     
-    # --- DICCIONARIO DE REFERENCIAS ---
-    # Usamos números como llaves para facilitar la comparación numérica
+    # --- DICCIONARIO DE VALORES LABORATORIO ---
     referencias_calidad = {
-        185: {
-            'SCT': {'min': 3.20, 'std': 3.40},
-            'CMT': {'min': 35.0, 'std': 36.0},
-            'MULLEN': {'min': 68, 'std': 72},
-            'POROSIDAD': {'min': 70, 'std': 75}
+        146: {
+            'SCT': {'min': 2.40, 'std': 2.60},
+            'CMT': {'min': 29, 'std': 32},
+        },
+        160: {
+            'SCT': {'min': 2.80, 'std': 3.0},
+            'CMT': {'min': 33, 'std': 36},
         },
         195: {
-            'SCT': {'min': 3.40, 'std': 3.65},
-            'CMT': {'min': 35.0, 'std': 38.0},
+            'SCT': {'min': 3.20, 'std': 3.40},
+            'CMT': {'min': 35, 'std': 39},
+        },
+        170: {
+            'SCT': {'min': 2.74, 'std': 2.98},
+            'MULLEN': {'min': 68, 'std': 74},
+        },
+        205: {
+            'SCT': {'min': 3.30, 'std': 3.59},
+            'MULLEN': {'min': 74, 'std': 80},
+        },
+        230: {
+            'SCT': {'min': 3.70, 'std': 4.16},
             'MULLEN': {'min': 72, 'std': 76},
-            'POROSIDAD': {'min': 75, 'std': 80}
+        },
+        270: {
+            'SCT': {'min': 4.35, 'std': 4.73},
+            'MULLEN': {'min': 90, 'std': 95},
+        },
+        120: {
+            'SCT': {'min': 1.97, 'std': 2.28},
+            'CMT': {'min': 22, 'std': 26.5},
+            'MULLEN': {'min': 48, 'std': 53},
+        },
+        150: {
+            'SCT': {'min': 2.90, 'std': 3.10},
+            'CMT': {'min': 32, 'std': 36},
+            'MULLEN': {'min': 62, 'std': 70},
         }
+    
     }
 
     properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
@@ -242,12 +268,12 @@ def display_boxplots_tab(df_full):
                         ax.scatter(i, val_min, color='red', s=180, edgecolors='white', 
                                    linewidth=2, label='Mínimo' if i==0 else "", zorder=10)
                         ax.text(i + 0.12, val_min, f'Min: {val_min}', color='red', 
-                                fontweight='bold', va='center', zorder=11, fontsize=10)
+                                fontweight='bold', va='center', zorder=11, fontsize=9)
                         
                         ax.scatter(i, val_std, color='green', s=180, edgecolors='white', 
                                    linewidth=2, label='Estándar' if i==0 else "", zorder=10)
                         ax.text(i + 0.12, val_std, f'Std: {val_std}', color='green', 
-                                fontweight='bold', va='center', zorder=11, fontsize=10)
+                                fontweight='bold', va='center', zorder=11, fontsize=9)
                 except:
                     continue # Si el gramaje no es un número válido, saltar
 
