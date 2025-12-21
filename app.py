@@ -241,39 +241,40 @@ def display_boxplots_tab(df_full):
     }
 
     properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
-    # Obtenemos los gramajes presentes en los datos
-    gramajes_eje_x = sorted(df_full['GRAMAJE'].unique())
-
+    
     for prop in properties_to_plot:
         if prop in df_full.columns:
-            # Validar si hay datos suficientes para graficar
             if df_full[prop].dropna().empty:
                 continue
                 
             fig, ax = plt.subplots(figsize=(10, 6))
             
             # 1. Dibujar Boxplot y Swarmplot
+            # Es vital obtener el orden exacto de las etiquetas del eje X
             sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=ax, width=0.5)
             sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.4, ax=ax)
             
-            # 2. Dibujar los puntos de referencia (Condicional)
-            for i, gramaje in enumerate(gramajes_eje_x):
+            # OBTENEMOS LAS ETIQUETAS ACTUALES DEL GRÁFICO (tal cual aparecen en pantalla)
+            etiquetas_x = [t.get_text() for t in ax.get_xticklabels()]
+            
+            # 2. Dibujar los puntos de referencia basados en la POSICIÓN REAL
+            for i, label_x in enumerate(etiquetas_x):
                 try:
-                    g_int = int(float(gramaje))
+                    # Convertimos la etiqueta del eje X a número para buscar en el diccionario
+                    g_int = int(float(label_x))
                     
-                    # Verificamos si el gramaje existe en el diccionario Y si la propiedad existe para ese gramaje
                     if g_int in referencias_calidad and prop in referencias_calidad[g_int]:
                         val_min = referencias_calidad[g_int][prop]['min']
                         val_std = referencias_calidad[g_int][prop]['std']
                         
-                        # Marcadores de Calidad
+                        # Dibujamos usando 'i' que es la posición exacta en el eje horizontal
                         ax.scatter(i, val_min, color='red', s=180, edgecolors='white', 
-                                   linewidth=1.5, label='Mínimo' if i==0 else "", zorder=10)
+                                   linewidth=1.5, zorder=10)
                         ax.text(i + 0.12, val_min, f'{val_min}', color='red', 
                                 fontweight='bold', va='center', zorder=11, fontsize=9)
                         
                         ax.scatter(i, val_std, color='green', s=180, edgecolors='white', 
-                                   linewidth=1.5, label='Estándar' if i==0 else "", zorder=10)
+                                   linewidth=1.5, zorder=10)
                         ax.text(i + 0.12, val_std, f'{val_std}', color='green', 
                                 fontweight='bold', va='center', zorder=11, fontsize=9)
                 except (ValueError, TypeError):
@@ -282,8 +283,6 @@ def display_boxplots_tab(df_full):
             ax.set_title(f'Análisis de Distribución: {prop} por Gramaje')
             ax.set_ylabel(f'Valor de {prop}')
             ax.set_xlabel('Gramaje (g/m²)')
-            
-            # Margen generoso para que no se corten las etiquetas de texto
             ax.margins(y=0.18) 
             
             plt.tight_layout()
