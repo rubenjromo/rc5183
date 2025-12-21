@@ -139,18 +139,40 @@ def display_correlation_tab(df_corr):
 
 def display_reel_vs_tab(df_analisis):
     st.header("Gráficos de Variación vs. REEL")
-    st.info("Estos gráficos de línea muestran cómo varían las propiedades clave a lo largo de los diferentes reels, ayudando a identificar tendencias o inestabilidad en el proceso.")
+    st.info("Estos gráficos muestran la tendencia por REEL. Los espacios vacíos indican que no hubo toma de datos en esos registros.")
+    
     existing_features = [f for f in PROPIEDADES_PAPEL if f in df_analisis.columns]
     if not existing_features: return
+    
     n_features = len(existing_features)
     fig, axes = plt.subplots(n_features, 1, figsize=(12, 4 * n_features), sharex=True)
     if n_features == 1: axes = [axes]
+    
     for i, feature in enumerate(existing_features):
-        sns.lineplot(x='REEL', y=feature, data=df_analisis, ax=axes[i], marker='o', color='darkblue')
-        axes[i].set_title(f'Variación de {feature} a lo largo de los REELs')
-        axes[i].grid(axis='y', linestyle='--')
+        # --- SOLUCIÓN: Limpiar NaNs para evitar líneas de conexión erróneas ---
+        # Filtramos solo las filas que tienen datos para la propiedad específica
+        df_plot = df_analisis.dropna(subset=[feature]).copy()
+        
+        if not df_plot.empty:
+            # Graficamos usando lineplot con marcadores
+            sns.lineplot(
+                x='REEL', 
+                y=feature, 
+                data=df_plot, 
+                ax=axes[i], 
+                marker='o', 
+                markersize=8,
+                color='darkblue', 
+                linewidth=1.5
+            )
+            
+        axes[i].set_title(f'Tendencia de {feature} por REEL')
+        axes[i].set_ylabel(feature)
+        axes[i].grid(axis='y', linestyle='--', alpha=0.7)
+    
     plt.tight_layout()
-    st.pyplot(fig); plt.close(fig)
+    st.pyplot(fig)
+    plt.close(fig)
 
 def plot_scatter_relationships_for_tab(df, x_col, y_cols):
     existing_y_cols = [y for y in y_cols if y in df.columns and df[y].nunique() > 1]
