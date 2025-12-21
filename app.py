@@ -221,22 +221,22 @@ def display_boxplots_tab(df_full):
     
     # --- DICCIONARIO DE VALORES LABORATORIO (ACTUALIZADO) ---
     referencias_calidad = {
-        146: {'SCT': {'min': 2.40, 'std': 2.60}, 'CMT': {'min': 29.0, 'std': 32.0}},
-        160: {'SCT': {'min': 2.80, 'std': 3.00}, 'CMT': {'min': 33.0, 'std': 36.0}},
-        195: {'SCT': {'min': 3.20, 'std': 3.40}, 'CMT': {'min': 35.0, 'std': 39.0}},
-        170: {'SCT': {'min': 2.74, 'std': 2.98}, 'MULLEN': {'min': 68.0, 'std': 74.0}},
-        205: {'SCT': {'min': 3.30, 'std': 3.59}, 'MULLEN': {'min': 74.0, 'std': 80.0}},
-        230: {'SCT': {'min': 3.70, 'std': 4.16}, 'MULLEN': {'min': 72.0, 'std': 76.0}},
-        270: {'SCT': {'min': 4.35, 'std': 4.73}, 'MULLEN': {'min': 90.0, 'std': 95.0}},
+        146: {'SCT': {'min': 2.40, 'std': 2.60}, 'CMT': {'min': 29, 'std': 32}},
+        160: {'SCT': {'min': 2.80, 'std': 3.00}, 'CMT': {'min': 33, 'std': 36}},
+        195: {'SCT': {'min': 3.20, 'std': 3.40}, 'CMT': {'min': 35, 'std': 39}},
+        170: {'SCT': {'min': 2.74, 'std': 2.98}, 'MULLEN': {'min': 68, 'std': 74}},
+        205: {'SCT': {'min': 3.30, 'std': 3.59}, 'MULLEN': {'min': 74, 'std': 80}},
+        230: {'SCT': {'min': 3.70, 'std': 4.16}, 'MULLEN': {'min': 72, 'std': 76}},
+        270: {'SCT': {'min': 4.35, 'std': 4.73}, 'MULLEN': {'min': 90, 'std': 95}},
         120: {
             'SCT': {'min': 1.97, 'std': 2.28},
             'CMT': {'min': 22.0, 'std': 26.5},
-            'MULLEN': {'min': 48.0, 'std': 53.0},
+            'MULLEN': {'min': 48, 'std': 53},
         },
         150: {
             'SCT': {'min': 2.90, 'std': 3.10},
             'CMT': {'min': 32.0, 'std': 36.0},
-            'MULLEN': {'min': 62.0, 'std': 70.0},
+            'MULLEN': {'min': 62, 'std': 70},
         }
     }
 
