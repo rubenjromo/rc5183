@@ -139,31 +139,33 @@ def display_correlation_tab(df_corr):
 
 def display_reel_vs_tab(df_analisis):
     st.header("Gráficos de Variación vs. REEL")
-    st.info("Gráficos de tendencia. Los cortes en la línea indican ausencia de datos en esos REELs.")
+    st.info("Cortes en la línea indican ausencia de datos. Cada gráfica muestra su propio eje X.")
     
     existing_features = [f for f in PROPIEDADES_PAPEL if f in df_analisis.columns]
     if not existing_features: return
     
     n_features = len(existing_features)
-    fig, axes = plt.subplots(n_features, 1, figsize=(12, 4 * n_features), sharex=True)
+    # CAMBIO: sharex=False para que cada gráfica tenga su propia leyenda en X
+    fig, axes = plt.subplots(n_features, 1, figsize=(12, 4 * n_features), sharex=False)
     if n_features == 1: axes = [axes]
     
-    # Creamos un rango completo de REELs desde el mínimo al máximo para que existan los huecos
+    # Rango completo de REELs para mantener los huecos
     all_reels = pd.DataFrame({'REEL': range(int(df_analisis['REEL'].min()), int(df_analisis['REEL'].max()) + 1)})
 
     for i, feature in enumerate(existing_features):
-        # Unimos nuestros datos con el rango completo de REELs
-        # Esto reinserta los NaNs donde faltan REELs en la secuencia
         df_tendencia = pd.merge(all_reels, df_analisis[['REEL', feature]], on='REEL', how='left')
         
-        # Al graficar con Matplotlib directamente sobre el eje, 
-        # las líneas se cortan automáticamente donde hay NaN.
+        # Graficamos
         axes[i].plot(df_tendencia['REEL'], df_tendencia[feature], 
                      marker='o', markersize=4, linestyle='-', color='darkblue', linewidth=1.5)
         
         axes[i].set_title(f'Tendencia de {feature} por REEL')
         axes[i].set_ylabel(feature)
+        axes[i].set_xlabel('REEL') # Forzamos la etiqueta en cada eje
         axes[i].grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Opcional: Si tienes muchos REELs, podemos espaciar las etiquetas del eje X
+        # axes[i].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     plt.tight_layout()
     st.pyplot(fig)
