@@ -139,7 +139,7 @@ def display_correlation_tab(df_corr):
 
 def display_reel_vs_tab(df_analisis):
     st.header("Gráficos de Variación vs. REEL")
-    st.info("Estos gráficos muestran la tendencia por REEL. Los espacios vacíos indican que no hubo toma de datos en esos registros.")
+    st.info("Gráficos de tendencia. Los cortes en la línea indican ausencia de datos en esos REELs.")
     
     existing_features = [f for f in PROPIEDADES_PAPEL if f in df_analisis.columns]
     if not existing_features: return
@@ -148,28 +148,23 @@ def display_reel_vs_tab(df_analisis):
     fig, axes = plt.subplots(n_features, 1, figsize=(12, 4 * n_features), sharex=True)
     if n_features == 1: axes = [axes]
     
+    # Creamos un rango completo de REELs desde el mínimo al máximo para que existan los huecos
+    all_reels = pd.DataFrame({'REEL': range(int(df_analisis['REEL'].min()), int(df_analisis['REEL'].max()) + 1)})
+
     for i, feature in enumerate(existing_features):
-        # --- SOLUCIÓN: Limpiar NaNs para evitar líneas de conexión erróneas ---
-        # Filtramos solo las filas que tienen datos para la propiedad específica
-        df_plot = df_analisis.dropna(subset=[feature]).copy()
+        # Unimos nuestros datos con el rango completo de REELs
+        # Esto reinserta los NaNs donde faltan REELs en la secuencia
+        df_tendencia = pd.merge(all_reels, df_analisis[['REEL', feature]], on='REEL', how='left')
         
-        if not df_plot.empty:
-            # Graficamos usando lineplot con marcadores
-            sns.lineplot(
-                x='REEL', 
-                y=feature, 
-                data=df_plot, 
-                ax=axes[i], 
-                marker='o', 
-                markersize=8,
-                color='darkblue', 
-                linewidth=1.5
-            )
-            
+        # Al graficar con Matplotlib directamente sobre el eje, 
+        # las líneas se cortan automáticamente donde hay NaN.
+        axes[i].plot(df_tendencia['REEL'], df_tendencia[feature], 
+                     marker='o', markersize=4, linestyle='-', color='darkblue', linewidth=1.5)
+        
         axes[i].set_title(f'Tendencia de {feature} por REEL')
         axes[i].set_ylabel(feature)
         axes[i].grid(axis='y', linestyle='--', alpha=0.7)
-    
+
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
