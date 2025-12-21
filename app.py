@@ -139,7 +139,7 @@ def display_correlation_tab(df_corr):
 
 def display_reel_vs_tab(df_analisis):
     st.header("Gráficos de Variación vs. REEL")
-    st.info("Cortes en la línea indican ausencia de datos. Cada gráfica muestra su propio eje X.")
+    st.info("Variabilidad a lo largo de los reelsX.")
     
     existing_features = [f for f in PROPIEDADES_PAPEL if f in df_analisis.columns]
     if not existing_features: return
