@@ -230,12 +230,12 @@ def display_boxplots_tab(df_full):
         270: {'SCT': {'min': 4.35, 'std': 4.73}, 'MULLEN': {'min': 90, 'std': 95}},
         120: {
             'SCT': {'min': 1.97, 'std': 2.28},
-            'CMT': {'min': 22.0, 'std': 26.5},
+            'CMT': {'min': 22, 'std': 26.5},
             'MULLEN': {'min': 48, 'std': 53},
         },
         150: {
             'SCT': {'min': 2.90, 'std': 3.10},
-            'CMT': {'min': 32.0, 'std': 36.0},
+            'CMT': {'min': 32, 'std': 36},
             'MULLEN': {'min': 62, 'std': 70},
         }
     }
@@ -281,7 +281,7 @@ def display_boxplots_tab(df_full):
                     continue 
 
             ax.set_title(f'Análisis de Distribución: {prop} por Gramaje')
-            ax.set_ylabel(f'Valor de {prop}')
+            ax.set_ylabel(f'{prop}')
             ax.set_xlabel('Gramaje (g/m²)')
             ax.margins(y=0.18) 
             
