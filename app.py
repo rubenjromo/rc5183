@@ -200,95 +200,76 @@ def display_boxplots_tab(df_full):
         * **Puntos Negros (Swarm)**: Datos reales de cada REEL.
         """)
     
-    # --- DICCIONARIO DE VALORES LABORATORIO ---
+    # --- DICCIONARIO DE VALORES LABORATORIO (ACTUALIZADO) ---
     referencias_calidad = {
-        146: {
-            'SCT': {'min': 2.40, 'std': 2.60},
-            'CMT': {'min': 29, 'std': 32},
-        },
-        160: {
-            'SCT': {'min': 2.80, 'std': 3.0},
-            'CMT': {'min': 33, 'std': 36},
-        },
-        195: {
-            'SCT': {'min': 3.20, 'std': 3.40},
-            'CMT': {'min': 35, 'std': 39},
-        },
-        170: {
-            'SCT': {'min': 2.74, 'std': 2.98},
-            'MULLEN': {'min': 68, 'std': 74},
-        },
-        205: {
-            'SCT': {'min': 3.30, 'std': 3.59},
-            'MULLEN': {'min': 74, 'std': 80},
-        },
-        230: {
-            'SCT': {'min': 3.70, 'std': 4.16},
-            'MULLEN': {'min': 72, 'std': 76},
-        },
-        270: {
-            'SCT': {'min': 4.35, 'std': 4.73},
-            'MULLEN': {'min': 90, 'std': 95},
-        },
+        146: {'SCT': {'min': 2.40, 'std': 2.60}, 'CMT': {'min': 29.0, 'std': 32.0}},
+        160: {'SCT': {'min': 2.80, 'std': 3.00}, 'CMT': {'min': 33.0, 'std': 36.0}},
+        195: {'SCT': {'min': 3.20, 'std': 3.40}, 'CMT': {'min': 35.0, 'std': 39.0}},
+        170: {'SCT': {'min': 2.74, 'std': 2.98}, 'MULLEN': {'min': 68.0, 'std': 74.0}},
+        205: {'SCT': {'min': 3.30, 'std': 3.59}, 'MULLEN': {'min': 74.0, 'std': 80.0}},
+        230: {'SCT': {'min': 3.70, 'std': 4.16}, 'MULLEN': {'min': 72.0, 'std': 76.0}},
+        270: {'SCT': {'min': 4.35, 'std': 4.73}, 'MULLEN': {'min': 90.0, 'std': 95.0}},
         120: {
             'SCT': {'min': 1.97, 'std': 2.28},
-            'CMT': {'min': 22, 'std': 26.5},
-            'MULLEN': {'min': 48, 'std': 53},
+            'CMT': {'min': 22.0, 'std': 26.5},
+            'MULLEN': {'min': 48.0, 'std': 53.0},
         },
         150: {
             'SCT': {'min': 2.90, 'std': 3.10},
-            'CMT': {'min': 32, 'std': 36},
-            'MULLEN': {'min': 62, 'std': 70},
+            'CMT': {'min': 32.0, 'std': 36.0},
+            'MULLEN': {'min': 62.0, 'std': 70.0},
         }
-    
     }
 
     properties_to_plot = ['MULLEN', 'SCT', 'CMT', 'POROSIDAD']
+    # Obtenemos los gramajes presentes en los datos
     gramajes_eje_x = sorted(df_full['GRAMAJE'].unique())
 
     for prop in properties_to_plot:
         if prop in df_full.columns:
+            # Validar si hay datos suficientes para graficar
+            if df_full[prop].dropna().empty:
+                continue
+                
             fig, ax = plt.subplots(figsize=(10, 6))
             
             # 1. Dibujar Boxplot y Swarmplot
             sns.boxplot(x='GRAMAJE', y=prop, data=df_full, palette='viridis', ax=ax, width=0.5)
             sns.swarmplot(x='GRAMAJE', y=prop, data=df_full, color='black', size=3, alpha=0.4, ax=ax)
             
-            # 2. Dibujar los puntos de referencia
+            # 2. Dibujar los puntos de referencia (Condicional)
             for i, gramaje in enumerate(gramajes_eje_x):
                 try:
-                    # FORZAMOS el gramaje a entero para asegurar que 185.0 o "185" sean 185
                     g_int = int(float(gramaje))
                     
+                    # Verificamos si el gramaje existe en el diccionario Y si la propiedad existe para ese gramaje
                     if g_int in referencias_calidad and prop in referencias_calidad[g_int]:
                         val_min = referencias_calidad[g_int][prop]['min']
                         val_std = referencias_calidad[g_int][prop]['std']
                         
-                        # Usamos scatter con zorder=10 para que flote sobre todo
+                        # Marcadores de Calidad
                         ax.scatter(i, val_min, color='red', s=180, edgecolors='white', 
-                                   linewidth=2, label='Mínimo' if i==0 else "", zorder=10)
-                        ax.text(i + 0.12, val_min, f'Min: {val_min}', color='red', 
+                                   linewidth=1.5, label='Mínimo' if i==0 else "", zorder=10)
+                        ax.text(i + 0.12, val_min, f'{val_min}', color='red', 
                                 fontweight='bold', va='center', zorder=11, fontsize=9)
                         
                         ax.scatter(i, val_std, color='green', s=180, edgecolors='white', 
-                                   linewidth=2, label='Estándar' if i==0 else "", zorder=10)
-                        ax.text(i + 0.12, val_std, f'Std: {val_std}', color='green', 
+                                   linewidth=1.5, label='Estándar' if i==0 else "", zorder=10)
+                        ax.text(i + 0.12, val_std, f'{val_std}', color='green', 
                                 fontweight='bold', va='center', zorder=11, fontsize=9)
-                except:
-                    continue # Si el gramaje no es un número válido, saltar
+                except (ValueError, TypeError):
+                    continue 
 
-            ax.set_title(f'Distribución de {prop} por Gramaje')
-            ax.set_ylabel(f'{prop}')
-            ax.set_xlabel('Gramaje')
+            ax.set_title(f'Análisis de Distribución: {prop} por Gramaje')
+            ax.set_ylabel(f'Valor de {prop}')
+            ax.set_xlabel('Gramaje (g/m²)')
             
-            # Forzar a que el eje Y incluya los puntos aunque estén lejos de los datos
-            y_min_data = df_full[prop].min()
-            y_max_data = df_full[prop].max()
-            # Si hay datos de referencia para este gramaje, incluirlos en el cálculo del límite
-            ax.margins(y=0.15) 
+            # Margen generoso para que no se corten las etiquetas de texto
+            ax.margins(y=0.18) 
             
             plt.tight_layout()
-            st.pyplot(fig); plt.close(fig)
+            st.pyplot(fig)
+            plt.close(fig)
 
 def run_ols_analysis_clean(df, dependent_var):
     model_cols = [dependent_var, 'DOSIFICACIÓN', 'VELOCIDAD', 'PESO', 'ALMIDÓN', 'LABIO', 'CHORRO', 'COLUMNA']
